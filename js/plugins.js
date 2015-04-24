@@ -4,7 +4,7 @@ window.Backbone = require('backbone');
 Backbone.$ = $;
 
 // local
-var _ = require('lodash');
+var _ = require('underscore');
 
 // Fuck you require, I don't know why it fails to find these modules for discus, but it does
 // so we define this to catch the modules it fails to load..
