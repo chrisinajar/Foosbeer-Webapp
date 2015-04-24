@@ -16,7 +16,7 @@ gulp.task('browserify', function() {
 		.pipe(license('MIT', {
 			organization: 'Swirl'
 		}))
-		.pipe(uglify({
-		}))
+		// .pipe(uglify({
+		// }))
 		.pipe(gulp.dest(config.dest));
 });
