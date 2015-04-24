@@ -1,3 +1,7 @@
-console.log("Hey!");
+window.jQuery = require('jquery');
 require('bootstrap');
-var App = require('/app.js');
+require('backbone');
+
+var App = require('./app.js');
+
+var Window = require('./window');

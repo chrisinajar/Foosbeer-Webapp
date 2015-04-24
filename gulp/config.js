@@ -2,6 +2,7 @@ module.exports = {
 	dest: 'dist/',
 
 	watch: {
-		'src/**/*.js': ['browserify']
+		'js/**/*.js': ['browserify'],
+		'css/**/*.scss': ['css']
 	}
 }
