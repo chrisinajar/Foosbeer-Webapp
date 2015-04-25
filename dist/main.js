@@ -9,7 +9,7 @@ $(function() {
 	Window.view.renderTo($('#view'));
 });
 
-},{"./app":2,"./plugins":8,"./window":9}],2:[function(require,module,exports){
+},{"./app":2,"./plugins":8,"./window":10}],2:[function(require,module,exports){
 var App = require('discus').createClone();
 
 // expose common objects
@@ -24,39 +24,39 @@ App.radio = require('backbone.radio');
 
 module.exports = App;
 
-},{"./common/collection":3,"./common/model":4,"./common/object":5,"./common/screen":6,"./common/view":7,"backbone.radio":10,"discus":15}],3:[function(require,module,exports){
+},{"./common/collection":3,"./common/model":4,"./common/object":5,"./common/screen":6,"./common/view":7,"backbone.radio":11,"discus":16}],3:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Collection.extend({
 
 });
-},{"discus":15}],4:[function(require,module,exports){
+},{"discus":16}],4:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Model.extend({
 
 });
 
-},{"discus":15}],5:[function(require,module,exports){
+},{"discus":16}],5:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Object.extend({
 
 });
-},{"discus":15}],6:[function(require,module,exports){
+},{"discus":16}],6:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Screen.extend({
 
 });
 
-},{"discus":15}],7:[function(require,module,exports){
+},{"discus":16}],7:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.View.extend({
 
 });
-},{"discus":15}],8:[function(require,module,exports){
+},{"discus":16}],8:[function(require,module,exports){
 // global
 window.jQuery = window.$ = require('jquery');
 window.Backbone = require('backbone');
@@ -87,17 +87,92 @@ require('discus');
 require('bootstrap');
 
 
-},{"backbone":12,"bootstrap":14,"discus":15,"jquery":16,"underscore":17}],9:[function(require,module,exports){
-var _ = require('underscore');
+},{"backbone":13,"bootstrap":15,"discus":16,"jquery":17,"underscore":18}],9:[function(require,module,exports){
 var App = require('../app');
+var _ = require('underscore');
 
-var Window = App.Screen.extend({
+var Header = App.View.extend({
+
+	tagName: 'nav',
+	className: 'header navbar navbar-default navbar-fixed-top',
+	// className: 'container-fluid',
+
 	template: _.template([
-		'Hey, this is a window!'
+		'<div class="container-fluid">',
+			'<div class="navbar-header">',
+				// this is the menu button, i don't really know why it doesn't appear until mobile
+				'<button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-collapse">',
+					'<span class="sr-only">Toggle navigation</span>',
+					'<span class="icon-bar"></span>',
+					'<span class="icon-bar"></span>',
+					'<span class="icon-bar"></span>',
+				'</button>',
+				'<a class="navbar-brand" href="#">FoosBeer</a>',
+				'</div>',
+
+	  			'<div class="collapse navbar-collapse" id="navbar-collapse">',
+					'<ul class="nav navbar-nav" id="top_nav">',
+						'<li><a href="/">Something</a></li>',
+					'</ul>',
+					'<ul class="nav navbar-nav navbar-right">',
+						'<li><a href="/">Minor</a></li>',
+					'</ul>',
+				'</div>',
+			'</div>',
+		'</div>',
 	].join('')),
 
 	initialize: function() {
+		this.stateModel = this.getSharedStateModel('window');
+
+		App.radio.channel('header').comply({
+			add: this.onAdd,
+			activate: this.onActivate,
+			remove: this.onRemove
+		}, this);
+	},
+	getTemplateData: function() {
+		var data = this._super("getTemplateData", arguments);
+
+		return data;
+	},
+	onAdd: function() {
+
+	},
+	onActivate: function(name) {
+		this.stateModel.set({
+			active: name
+		});
+	},
+	onRemove: function() {
+	}
+
+});
+
+module.exports = Header;
+},{"../app":2,"underscore":18}],10:[function(require,module,exports){
+var App = require('../app');
+var _ = require('underscore');
+
+var Header = require('./header');
+
+var Window = App.View.extend({
+	template: _.template([
+		'<nav class="header" id="window_header">',
+		'</nav>',
+		'<section>',
+			'Hey, this is a window!',
+		'</section>'
+	].join('')),
+
+	initialize: function() {
+		this.stateModel = this.createSharedStateModel('window');
+
 		console.log("I am a screen!");
+		this.header = new Header({
+			parent: this,
+			renderTo: '#window_header'
+		});
 	}
 });
 
@@ -106,7 +181,7 @@ module.exports = {
 	view: new Window()
 };
 
-},{"../app":2,"underscore":17}],10:[function(require,module,exports){
+},{"../app":2,"./header":9,"underscore":18}],11:[function(require,module,exports){
 // Backbone.Radio v0.9.0
 (function(root, factory) {
   if (typeof define === 'function' && define.amd) {
@@ -534,7 +609,7 @@ module.exports = {
   return Radio;
 }));
 
-},{"backbone":12,"underscore":11}],11:[function(require,module,exports){
+},{"backbone":13,"underscore":12}],12:[function(require,module,exports){
 //     Underscore.js 1.7.0
 //     http://underscorejs.org
 //     (c) 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -1951,7 +2026,7 @@ module.exports = {
   }
 }.call(this));
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 //     Backbone.js 1.1.2
 
 //     (c) 2010-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -3561,7 +3636,7 @@ module.exports = {
 
 }));
 
-},{"underscore":13}],13:[function(require,module,exports){
+},{"underscore":14}],14:[function(require,module,exports){
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -5111,7 +5186,7 @@ module.exports = {
   }
 }.call(this));
 
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 (function (global){
 
 ; jQuery = global.jQuery = require("jquery");
@@ -7438,7 +7513,7 @@ if (typeof jQuery === 'undefined') {
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{"jquery":16}],15:[function(require,module,exports){
+},{"jquery":17}],16:[function(require,module,exports){
 (function (global){
 /*!
  * Copyright (c) 2015 Swirl
@@ -10918,7 +10993,7 @@ module.exports = Discus.View;
 });
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v2.1.3
  * http://jquery.com/
@@ -20125,7 +20200,7 @@ return jQuery;
 
 }));
 
-},{}],17:[function(require,module,exports){
-arguments[4][13][0].apply(exports,arguments)
-},{"dup":13}]},{},[1])
+},{}],18:[function(require,module,exports){
+arguments[4][14][0].apply(exports,arguments)
+},{"dup":14}]},{},[1])
 

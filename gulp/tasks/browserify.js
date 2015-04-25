@@ -9,6 +9,8 @@ var fs = require('fs');
 var source = require('vinyl-source-stream');
 var buffer = require('vinyl-buffer');
 
+var plumber = require('gulp-plumber');
+
 
 gulp.task('browserify', function() {
 	var b = browserify({
@@ -17,6 +19,7 @@ gulp.task('browserify', function() {
 	});
 	b
 	.bundle()
+		.pipe(plumber())
 		.pipe(source('main.js'))
 		.pipe(buffer())
 		.pipe(sourcemaps.init({loadMaps: true}))
