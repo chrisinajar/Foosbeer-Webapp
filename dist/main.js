@@ -1,15 +1,18 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 require('./plugins');
 
-var App = require('./app');
+var App = require('app');
 
+var rpcgw = require('./rpcgw');
 var Window = require('./window');
 
+rpcgw.init();
+
+// Queue up window to render async when the dom is done
 $(function() {
 	Window.view.renderTo($('#view'));
 });
-
-},{"./app":2,"./plugins":8,"./window":10}],2:[function(require,module,exports){
+},{"./plugins":8,"./rpcgw":9,"./window":11,"app":2}],2:[function(require,module,exports){
 var App = require('discus').createClone();
 
 // expose common objects
@@ -22,41 +25,45 @@ App.View = require('./common/view');
 // quick reference to the global radio
 App.radio = require('backbone.radio');
 
+window.App = App;
+
 module.exports = App;
 
-},{"./common/collection":3,"./common/model":4,"./common/object":5,"./common/screen":6,"./common/view":7,"backbone.radio":11,"discus":16}],3:[function(require,module,exports){
+},{"./common/collection":3,"./common/model":4,"./common/object":5,"./common/screen":6,"./common/view":7,"backbone.radio":12,"discus":17}],3:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Collection.extend({
 
 });
-},{"discus":16}],4:[function(require,module,exports){
+},{"discus":17}],4:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Model.extend({
 
 });
 
-},{"discus":16}],5:[function(require,module,exports){
+},{"discus":17}],5:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Object.extend({
 
 });
-},{"discus":16}],6:[function(require,module,exports){
+},{"discus":17}],6:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Screen.extend({
 
 });
 
-},{"discus":16}],7:[function(require,module,exports){
+},{"discus":17}],7:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.View.extend({
 
 });
-},{"discus":16}],8:[function(require,module,exports){
+},{"discus":17}],8:[function(require,module,exports){
+// External stuff. don't load local modules here..
+
 // global
 window.jQuery = window.$ = require('jquery');
 window.Backbone = require('backbone');
@@ -86,9 +93,65 @@ window.require = function(name) {
 require('discus');
 require('bootstrap');
 
+},{"backbone":14,"bootstrap":16,"discus":17,"jquery":18,"underscore":19}],9:[function(require,module,exports){
+// rpcgw. handle login, rely on static login page for login
+var App = require('app');
 
-},{"backbone":13,"bootstrap":15,"discus":16,"jquery":17,"underscore":18}],9:[function(require,module,exports){
-var App = require('../app');
+var rpcgw = App.rpcgw = {
+	init: function() {
+		App.apiServer = location.protocol+'//'+location.host + '/api/';
+		if (localStorage.foosbeer_apiserver) {
+			App.apiServer = localStorage.foosbeer_apiserver;
+		}
+
+		rpcgw.client = new actionheroClient();
+		rpcgw.client.on('connected', function() {
+			console.log("Connected to action hero!");
+		});
+		rpcgw.client.on('error', function() {
+			console.error("ah error!", arguments);
+		});
+
+		$.getJSON('/api/hello', function(data) {
+			console.log(data);
+				rpcgw.client.connect(function(err, details) {
+					if (err != null) { //jshint ignore:line
+						console.log(err);
+					} else {
+						console.log(details);
+					}
+				});
+			})
+			.fail(function() {
+				console.log("Fail!!", arguments);
+				debugger;
+				location.href = "/login.html";
+			});
+	},
+
+	get: function(api, data) {
+		var self = this,
+			deff = new $.Deferred(),
+			promise;
+
+		rpcgw.client.action(api, data, function(result) {
+			if (result.error) {
+				deff.reject(result.error);
+			} else {
+				deff.resolve(result);
+			}
+		});
+
+		promise = deff.promise();
+
+		return promise;
+	}
+};
+
+module.exports = App.rpcgw;
+
+},{"app":2}],10:[function(require,module,exports){
+var App = require('app');
 var _ = require('underscore');
 
 var Header = App.View.extend({
@@ -112,10 +175,14 @@ var Header = App.View.extend({
 
 	  			'<div class="collapse navbar-collapse" id="navbar-collapse">',
 					'<ul class="nav navbar-nav" id="top_nav">',
-						'<li><a href="/">Something</a></li>',
+						'<% _(primaryItems).each(function(item) { %>',
+							'<li><a href="<%= item.href %>"><%= item.label %></a></li>',
+						'<% }) %>',
 					'</ul>',
 					'<ul class="nav navbar-nav navbar-right">',
-						'<li><a href="/">Minor</a></li>',
+						'<% _(secondaryItems).each(function(item) { %>',
+							'<li><a href="<%= item.href %>"><%= item.label %></a></li>',
+						'<% }) %>',
 					'</ul>',
 				'</div>',
 			'</div>',
@@ -124,34 +191,50 @@ var Header = App.View.extend({
 
 	initialize: function() {
 		this.stateModel = this.getSharedStateModel('window');
+		this.collection = new App.Collection();
+		this.stateModel.navItemCollection = this.collection;
 
 		App.radio.channel('header').comply({
 			add: this.onAdd,
 			activate: this.onActivate,
 			remove: this.onRemove
 		}, this);
+
+		App.radio.channel('header').command('add', {
+			type: 'secondary',
+			href: '/api/logout',
+			label: 'Logout'
+		});
 	},
 	getTemplateData: function() {
 		var data = this._super("getTemplateData", arguments);
 
+		data.primaryItems = _.invoke(this.collection.where({
+			type: 'primary'
+		}), 'toJSON');
+		data.secondaryItems = _.invoke(this.collection.where({
+			type: 'secondary'
+		}), 'toJSON');
+
 		return data;
 	},
-	onAdd: function() {
-
+	onAdd: function(item) {
+		this.collection.add(item);
 	},
 	onActivate: function(name) {
 		this.stateModel.set({
 			active: name
 		});
 	},
-	onRemove: function() {
+	onRemove: function(item) {
+		this.collection.remove(item);
 	}
 
 });
 
 module.exports = Header;
-},{"../app":2,"underscore":18}],10:[function(require,module,exports){
-var App = require('../app');
+},{"app":2,"underscore":19}],11:[function(require,module,exports){
+var App = require('app');
 var _ = require('underscore');
 
 var Header = require('./header');
@@ -181,7 +264,7 @@ module.exports = {
 	view: new Window()
 };
 
-},{"../app":2,"./header":9,"underscore":18}],11:[function(require,module,exports){
+},{"./header":10,"app":2,"underscore":19}],12:[function(require,module,exports){
 // Backbone.Radio v0.9.0
 (function(root, factory) {
   if (typeof define === 'function' && define.amd) {
@@ -609,7 +692,7 @@ module.exports = {
   return Radio;
 }));
 
-},{"backbone":13,"underscore":12}],12:[function(require,module,exports){
+},{"backbone":14,"underscore":13}],13:[function(require,module,exports){
 //     Underscore.js 1.7.0
 //     http://underscorejs.org
 //     (c) 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -2026,7 +2109,7 @@ module.exports = {
   }
 }.call(this));
 
-},{}],13:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 //     Backbone.js 1.1.2
 
 //     (c) 2010-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -3636,7 +3719,7 @@ module.exports = {
 
 }));
 
-},{"underscore":14}],14:[function(require,module,exports){
+},{"underscore":15}],15:[function(require,module,exports){
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -5186,7 +5269,7 @@ module.exports = {
   }
 }.call(this));
 
-},{}],15:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 (function (global){
 
 ; jQuery = global.jQuery = require("jquery");
@@ -7513,7 +7596,7 @@ if (typeof jQuery === 'undefined') {
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{"jquery":17}],16:[function(require,module,exports){
+},{"jquery":18}],17:[function(require,module,exports){
 (function (global){
 /*!
  * Copyright (c) 2015 Swirl
@@ -10993,7 +11076,7 @@ module.exports = Discus.View;
 });
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v2.1.3
  * http://jquery.com/
@@ -20200,7 +20283,7 @@ return jQuery;
 
 }));
 
-},{}],18:[function(require,module,exports){
-arguments[4][14][0].apply(exports,arguments)
-},{"dup":14}]},{},[1])
+},{}],19:[function(require,module,exports){
+arguments[4][15][0].apply(exports,arguments)
+},{"dup":15}]},{},[1])
 

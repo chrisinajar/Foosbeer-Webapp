@@ -3,7 +3,10 @@
 		<title>FoosBeer</title>
 		<script type="text/javascript">
 			(function() {
-				var tag = '<script type="text/javascript" src="dist/main.js?_=' + (new Date).getTime() + '"></s' + 'cript>';
+				var tag = '<script type="text/javascript" src="//' + location.host + ':4387/public/javascript/actionheroClient.js?_=' + (new Date).getTime() + '"></s' + 'cript>';
+				document.write(tag);
+
+				tag = '<script type="text/javascript" src="dist/main.js?_=' + (new Date).getTime() + '"></s' + 'cript>';
 				document.write(tag);
 
 				tag = '<link rel="stylesheet" href="dist/main.css?_=' + (new Date).getTime() + '">';

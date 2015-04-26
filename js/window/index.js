@@ -1,4 +1,4 @@
-var App = require('../app');
+var App = require('app');
 var _ = require('underscore');
 
 var Header = require('./header');

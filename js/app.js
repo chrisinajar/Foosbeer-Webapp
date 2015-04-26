@@ -10,4 +10,6 @@ App.View = require('./common/view');
 // quick reference to the global radio
 App.radio = require('backbone.radio');
 
+window.App = App;
+
 module.exports = App;

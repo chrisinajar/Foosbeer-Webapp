@@ -1,3 +1,5 @@
+// External stuff. don't load local modules here..
+
 // global
 window.jQuery = window.$ = require('jquery');
 window.Backbone = require('backbone');
@@ -26,4 +28,3 @@ window.require = function(name) {
 // execute
 require('discus');
 require('bootstrap');
-
