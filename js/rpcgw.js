@@ -1,5 +1,18 @@
 // rpcgw. handle login, rely on static login page for login
 var App = require('app');
+var User = require('./models/user');
+
+
+App.logout = function() {
+	return $.ajax({
+		url: '/api/logout',
+		type: 'get',
+		data: {},
+		xhrFields: {
+			withCredentials: true
+		}
+	});
+};
 
 var rpcgw = App.rpcgw = {
 	init: function() {
@@ -13,7 +26,7 @@ var rpcgw = App.rpcgw = {
 			console.log("Connected to action hero!");
 		});
 		rpcgw.client.on('error', function() {
-			console.error("ah error!", arguments);
+			console.error("Action Hero threw an error!", arguments);
 		});
 
 		$.getJSON('/api/hello', function(data) {
@@ -23,6 +36,7 @@ var rpcgw = App.rpcgw = {
 						console.log(err);
 					} else {
 						console.log(details);
+						App.user = new User(details.user);
 					}
 				});
 			})

@@ -12,7 +12,7 @@ rpcgw.init();
 $(function() {
 	Window.view.renderTo($('#view'));
 });
-},{"./plugins":8,"./rpcgw":9,"./window":11,"app":2}],2:[function(require,module,exports){
+},{"./plugins":9,"./rpcgw":10,"./window":12,"app":2}],2:[function(require,module,exports){
 var App = require('discus').createClone();
 
 // expose common objects
@@ -29,39 +29,54 @@ window.App = App;
 
 module.exports = App;
 
-},{"./common/collection":3,"./common/model":4,"./common/object":5,"./common/screen":6,"./common/view":7,"backbone.radio":12,"discus":17}],3:[function(require,module,exports){
+},{"./common/collection":3,"./common/model":4,"./common/object":5,"./common/screen":6,"./common/view":7,"backbone.radio":13,"discus":18}],3:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Collection.extend({
 
 });
-},{"discus":17}],4:[function(require,module,exports){
+},{"discus":18}],4:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Model.extend({
 
 });
 
-},{"discus":17}],5:[function(require,module,exports){
+},{"discus":18}],5:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Object.extend({
 
 });
-},{"discus":17}],6:[function(require,module,exports){
+},{"discus":18}],6:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Screen.extend({
 
 });
 
-},{"discus":17}],7:[function(require,module,exports){
+},{"discus":18}],7:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.View.extend({
 
 });
-},{"discus":17}],8:[function(require,module,exports){
+},{"discus":18}],8:[function(require,module,exports){
+var App = require('../app');
+
+var User = App.Model.extend({
+	defaults: {
+		email: null,
+		mmr: 500,
+		name: "Full Name",
+		profile: {}
+	}
+
+});
+
+module.exports = User;
+
+},{"../app":2}],9:[function(require,module,exports){
 // External stuff. don't load local modules here..
 
 // global
@@ -93,9 +108,22 @@ window.require = function(name) {
 require('discus');
 require('bootstrap');
 
-},{"backbone":14,"bootstrap":16,"discus":17,"jquery":18,"underscore":19}],9:[function(require,module,exports){
+},{"backbone":15,"bootstrap":17,"discus":18,"jquery":19,"underscore":20}],10:[function(require,module,exports){
 // rpcgw. handle login, rely on static login page for login
 var App = require('app');
+var User = require('./models/user');
+
+
+App.logout = function() {
+	return $.ajax({
+		url: '/api/logout',
+		type: 'get',
+		data: {},
+		xhrFields: {
+			withCredentials: true
+		}
+	});
+};
 
 var rpcgw = App.rpcgw = {
 	init: function() {
@@ -109,7 +137,7 @@ var rpcgw = App.rpcgw = {
 			console.log("Connected to action hero!");
 		});
 		rpcgw.client.on('error', function() {
-			console.error("ah error!", arguments);
+			console.error("Action Hero threw an error!", arguments);
 		});
 
 		$.getJSON('/api/hello', function(data) {
@@ -119,6 +147,7 @@ var rpcgw = App.rpcgw = {
 						console.log(err);
 					} else {
 						console.log(details);
+						App.user = new User(details.user);
 					}
 				});
 			})
@@ -150,7 +179,7 @@ var rpcgw = App.rpcgw = {
 
 module.exports = App.rpcgw;
 
-},{"app":2}],10:[function(require,module,exports){
+},{"./models/user":8,"app":2}],11:[function(require,module,exports){
 var App = require('app');
 var _ = require('underscore');
 
@@ -176,18 +205,23 @@ var Header = App.View.extend({
 	  			'<div class="collapse navbar-collapse" id="navbar-collapse">',
 					'<ul class="nav navbar-nav" id="top_nav">',
 						'<% _(primaryItems).each(function(item) { %>',
-							'<li><a href="<%= item.href %>"><%= item.label %></a></li>',
+							'<li><a class="primaryAction" data-id="<%= item.id %>" href="<%= item.href || "#" %>"><%= item.label %></a></li>',
 						'<% }) %>',
 					'</ul>',
 					'<ul class="nav navbar-nav navbar-right">',
 						'<% _(secondaryItems).each(function(item) { %>',
-							'<li><a href="<%= item.href %>"><%= item.label %></a></li>',
+							'<li><a class="secondaryAction" data-id="<%= item.id %>" href="<%= item.href || "#" %>"><%= item.label %></a></li>',
 						'<% }) %>',
 					'</ul>',
 				'</div>',
 			'</div>',
 		'</div>',
 	].join('')),
+
+	events: {
+		'click .secondaryAction': 'executeAction',
+		'click .primaryAction': 'executeAction'
+	},
 
 	initialize: function() {
 		this.stateModel = this.getSharedStateModel('window');
@@ -202,7 +236,11 @@ var Header = App.View.extend({
 
 		App.radio.channel('header').command('add', {
 			type: 'secondary',
-			href: '/api/logout',
+			action: function() {
+				App.logout().always(function() {
+					location.reload();
+				});
+			},
 			label: 'Logout'
 		});
 	},
@@ -218,7 +256,17 @@ var Header = App.View.extend({
 
 		return data;
 	},
+	executeAction: function(e) {
+		var target = $(e.target).closest('a'),
+			item = this.collection.get(target.data('id'));
+
+		if (item.get('action')) {
+			item.get('action').apply(item);
+			return this.preventDefault(e);
+		}
+	},
 	onAdd: function(item) {
+		item.id = _.uniqueId('navItem_');
 		this.collection.add(item);
 	},
 	onActivate: function(name) {
@@ -233,7 +281,7 @@ var Header = App.View.extend({
 });
 
 module.exports = Header;
-},{"app":2,"underscore":19}],11:[function(require,module,exports){
+},{"app":2,"underscore":20}],12:[function(require,module,exports){
 var App = require('app');
 var _ = require('underscore');
 
@@ -264,7 +312,7 @@ module.exports = {
 	view: new Window()
 };
 
-},{"./header":10,"app":2,"underscore":19}],12:[function(require,module,exports){
+},{"./header":11,"app":2,"underscore":20}],13:[function(require,module,exports){
 // Backbone.Radio v0.9.0
 (function(root, factory) {
   if (typeof define === 'function' && define.amd) {
@@ -692,7 +740,7 @@ module.exports = {
   return Radio;
 }));
 
-},{"backbone":14,"underscore":13}],13:[function(require,module,exports){
+},{"backbone":15,"underscore":14}],14:[function(require,module,exports){
 //     Underscore.js 1.7.0
 //     http://underscorejs.org
 //     (c) 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -2109,7 +2157,7 @@ module.exports = {
   }
 }.call(this));
 
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 //     Backbone.js 1.1.2
 
 //     (c) 2010-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -3719,7 +3767,7 @@ module.exports = {
 
 }));
 
-},{"underscore":15}],15:[function(require,module,exports){
+},{"underscore":16}],16:[function(require,module,exports){
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -5269,7 +5317,7 @@ module.exports = {
   }
 }.call(this));
 
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 (function (global){
 
 ; jQuery = global.jQuery = require("jquery");
@@ -7596,7 +7644,7 @@ if (typeof jQuery === 'undefined') {
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{"jquery":18}],17:[function(require,module,exports){
+},{"jquery":19}],18:[function(require,module,exports){
 (function (global){
 /*!
  * Copyright (c) 2015 Swirl
@@ -11076,7 +11124,7 @@ module.exports = Discus.View;
 });
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v2.1.3
  * http://jquery.com/
@@ -20283,7 +20331,7 @@ return jQuery;
 
 }));
 
-},{}],19:[function(require,module,exports){
-arguments[4][15][0].apply(exports,arguments)
-},{"dup":15}]},{},[1])
+},{}],20:[function(require,module,exports){
+arguments[4][16][0].apply(exports,arguments)
+},{"dup":16}]},{},[1])
 

@@ -23,18 +23,23 @@ var Header = App.View.extend({
 	  			'<div class="collapse navbar-collapse" id="navbar-collapse">',
 					'<ul class="nav navbar-nav" id="top_nav">',
 						'<% _(primaryItems).each(function(item) { %>',
-							'<li><a href="<%= item.href %>"><%= item.label %></a></li>',
+							'<li><a class="primaryAction" data-id="<%= item.id %>" href="<%= item.href || "#" %>"><%= item.label %></a></li>',
 						'<% }) %>',
 					'</ul>',
 					'<ul class="nav navbar-nav navbar-right">',
 						'<% _(secondaryItems).each(function(item) { %>',
-							'<li><a href="<%= item.href %>"><%= item.label %></a></li>',
+							'<li><a class="secondaryAction" data-id="<%= item.id %>" href="<%= item.href || "#" %>"><%= item.label %></a></li>',
 						'<% }) %>',
 					'</ul>',
 				'</div>',
 			'</div>',
 		'</div>',
 	].join('')),
+
+	events: {
+		'click .secondaryAction': 'executeAction',
+		'click .primaryAction': 'executeAction'
+	},
 
 	initialize: function() {
 		this.stateModel = this.getSharedStateModel('window');
@@ -49,7 +54,11 @@ var Header = App.View.extend({
 
 		App.radio.channel('header').command('add', {
 			type: 'secondary',
-			href: '/api/logout',
+			action: function() {
+				App.logout().always(function() {
+					location.reload();
+				});
+			},
 			label: 'Logout'
 		});
 	},
@@ -65,7 +74,17 @@ var Header = App.View.extend({
 
 		return data;
 	},
+	executeAction: function(e) {
+		var target = $(e.target).closest('a'),
+			item = this.collection.get(target.data('id'));
+
+		if (item.get('action')) {
+			item.get('action').apply(item);
+			return this.preventDefault(e);
+		}
+	},
 	onAdd: function(item) {
+		item.id = _.uniqueId('navItem_');
 		this.collection.add(item);
 	},
 	onActivate: function(name) {
