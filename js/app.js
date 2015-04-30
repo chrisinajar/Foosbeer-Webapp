@@ -12,4 +12,12 @@ App.radio = require('backbone.radio');
 
 window.App = App;
 
+App.addRouter = function(Type) {
+	var instance = new Type();
+	debugger;
+	App.router = instance; // fuckit
+
+	// do something with instance?
+};
+
 module.exports = App;

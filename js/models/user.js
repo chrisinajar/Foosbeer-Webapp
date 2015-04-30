@@ -1,4 +1,4 @@
-var App = require('../app');
+var App = require('app');
 
 var User = App.Model.extend({
 	defaults: {

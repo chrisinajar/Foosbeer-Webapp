@@ -31,6 +31,7 @@
     "vinyl-source-stream": "^1.1.0"
   },
   "dependencies": {
+    "ampersand-router": "^3.0.2",
     "backbone": "^1.1.2",
     "backbone.iobind": "^0.4.9",
     "backbone.radio": "^0.9.0",

@@ -6,13 +6,25 @@ var App = require('app');
 var rpcgw = require('./rpcgw');
 var Window = require('./window');
 
-rpcgw.init();
+require('./screens');
 
-// Queue up window to render async when the dom is done
-$(function() {
-	Window.view.renderTo($('#view'));
-});
-},{"./plugins":9,"./rpcgw":10,"./window":12,"app":2}],2:[function(require,module,exports){
+rpcgw.init()
+	.done(function() {
+		// Queue up window to render async when the dom is done, it probably is already done, so this probably isn't async...
+		// people who use document ready are NERDS
+		$(function() {
+			Window.view.renderTo($('#view'));
+			// debugger;
+			App.router.history.start();
+		});
+	})
+	.fail(function() {
+		console.log("Fail!!", arguments);
+		debugger; //jshint ignore:line
+		location.href = "/login.html";
+	});
+
+},{"./plugins":9,"./rpcgw":10,"./screens":14,"./window":16,"app":2}],2:[function(require,module,exports){
 var App = require('discus').createClone();
 
 // expose common objects
@@ -27,42 +39,50 @@ App.radio = require('backbone.radio');
 
 window.App = App;
 
+App.addRouter = function(Type) {
+	var instance = new Type();
+	debugger;
+	App.router = instance; // fuckit
+
+	// do something with instance?
+};
+
 module.exports = App;
 
-},{"./common/collection":3,"./common/model":4,"./common/object":5,"./common/screen":6,"./common/view":7,"backbone.radio":13,"discus":18}],3:[function(require,module,exports){
+},{"./common/collection":3,"./common/model":4,"./common/object":5,"./common/screen":6,"./common/view":7,"backbone.radio":17,"discus":22}],3:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Collection.extend({
 
 });
-},{"discus":18}],4:[function(require,module,exports){
+},{"discus":22}],4:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Model.extend({
 
 });
 
-},{"discus":18}],5:[function(require,module,exports){
+},{"discus":22}],5:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Object.extend({
 
 });
-},{"discus":18}],6:[function(require,module,exports){
+},{"discus":22}],6:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Screen.extend({
 
 });
 
-},{"discus":18}],7:[function(require,module,exports){
+},{"discus":22}],7:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.View.extend({
 
 });
-},{"discus":18}],8:[function(require,module,exports){
-var App = require('../app');
+},{"discus":22}],8:[function(require,module,exports){
+var App = require('app');
 
 var User = App.Model.extend({
 	defaults: {
@@ -76,7 +96,7 @@ var User = App.Model.extend({
 
 module.exports = User;
 
-},{"../app":2}],9:[function(require,module,exports){
+},{"app":2}],9:[function(require,module,exports){
 // External stuff. don't load local modules here..
 
 // global
@@ -108,7 +128,7 @@ window.require = function(name) {
 require('discus');
 require('bootstrap');
 
-},{"backbone":15,"bootstrap":17,"discus":18,"jquery":19,"underscore":20}],10:[function(require,module,exports){
+},{"backbone":19,"bootstrap":21,"discus":22,"jquery":23,"underscore":24}],10:[function(require,module,exports){
 // rpcgw. handle login, rely on static login page for login
 var App = require('app');
 var User = require('./models/user');
@@ -127,6 +147,8 @@ App.logout = function() {
 
 var rpcgw = App.rpcgw = {
 	init: function() {
+		var deferr = new $.Deferred();
+
 		App.apiServer = location.protocol+'//'+location.host + '/api/';
 		if (localStorage.foosbeer_apiserver) {
 			App.apiServer = localStorage.foosbeer_apiserver;
@@ -140,22 +162,26 @@ var rpcgw = App.rpcgw = {
 			console.error("Action Hero threw an error!", arguments);
 		});
 
+
 		$.getJSON('/api/hello', function(data) {
 			console.log(data);
 				rpcgw.client.connect(function(err, details) {
 					if (err != null) { //jshint ignore:line
 						console.log(err);
+						deferr.reject(err);
 					} else {
 						console.log(details);
 						App.user = new User(details.user);
+
+						deferr.resolve(App.user);
 					}
 				});
 			})
 			.fail(function() {
-				console.log("Fail!!", arguments);
-				debugger;
-				location.href = "/login.html";
+				deferr.reject.apply(deferr, arguments);
 			});
+
+		return deferr.promise();
 	},
 
 	get: function(api, data) {
@@ -180,6 +206,65 @@ var rpcgw = App.rpcgw = {
 module.exports = App.rpcgw;
 
 },{"./models/user":8,"app":2}],11:[function(require,module,exports){
+var App = require('app');
+
+App.addRouter(require('./router'));
+
+// should this really exist?
+
+},{"./router":12,"app":2}],12:[function(require,module,exports){
+var App = require('app');
+var Dashboard = require('./view');
+
+var DashboardRouter = App.Router.extend({
+	routes: {
+		'': 'home',
+		'dashboard': 'dashboard'
+	},
+
+	home: function() {
+		//           To? really?
+		this.redirectTo('dashboard');
+	},
+
+	dashboard: function() {
+		var dashboard = new Dashboard();
+		App.window.setView(dashboard);
+	}
+});
+
+module.exports = DashboardRouter;
+
+},{"./view":13,"app":2}],13:[function(require,module,exports){
+var App = require('app');
+var _ = require('underscore');
+
+var Dashboard = App.Screen.extend({
+	template: _.template([
+	].join('')),
+
+	initialize: function() {
+		console.log("I'm a screen!");
+	},
+
+	getTemplateData: function() {
+		var data = this._super('getTemplateData', arguments);
+
+		data.user = App.user;
+		debugger;
+
+		return data;
+	}
+});
+
+module.exports = Dashboard;
+
+},{"app":2,"underscore":24}],14:[function(require,module,exports){
+//include screens here!
+
+require('./dashboard');
+
+},{"./dashboard":11}],15:[function(require,module,exports){
 var App = require('app');
 var _ = require('underscore');
 
@@ -281,7 +366,7 @@ var Header = App.View.extend({
 });
 
 module.exports = Header;
-},{"app":2,"underscore":20}],12:[function(require,module,exports){
+},{"app":2,"underscore":24}],16:[function(require,module,exports){
 var App = require('app');
 var _ = require('underscore');
 
@@ -299,7 +384,6 @@ var Window = App.View.extend({
 	initialize: function() {
 		this.stateModel = this.createSharedStateModel('window');
 
-		console.log("I am a screen!");
 		this.header = new Header({
 			parent: this,
 			renderTo: '#window_header'
@@ -312,7 +396,7 @@ module.exports = {
 	view: new Window()
 };
 
-},{"./header":11,"app":2,"underscore":20}],13:[function(require,module,exports){
+},{"./header":15,"app":2,"underscore":24}],17:[function(require,module,exports){
 // Backbone.Radio v0.9.0
 (function(root, factory) {
   if (typeof define === 'function' && define.amd) {
@@ -740,7 +824,7 @@ module.exports = {
   return Radio;
 }));
 
-},{"backbone":15,"underscore":14}],14:[function(require,module,exports){
+},{"backbone":19,"underscore":18}],18:[function(require,module,exports){
 //     Underscore.js 1.7.0
 //     http://underscorejs.org
 //     (c) 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -2157,7 +2241,7 @@ module.exports = {
   }
 }.call(this));
 
-},{}],15:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 //     Backbone.js 1.1.2
 
 //     (c) 2010-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -3767,7 +3851,7 @@ module.exports = {
 
 }));
 
-},{"underscore":16}],16:[function(require,module,exports){
+},{"underscore":20}],20:[function(require,module,exports){
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -5317,7 +5401,7 @@ module.exports = {
   }
 }.call(this));
 
-},{}],17:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 (function (global){
 
 ; jQuery = global.jQuery = require("jquery");
@@ -7644,7 +7728,7 @@ if (typeof jQuery === 'undefined') {
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{"jquery":19}],18:[function(require,module,exports){
+},{"jquery":23}],22:[function(require,module,exports){
 (function (global){
 /*!
  * Copyright (c) 2015 Swirl
@@ -11124,7 +11208,7 @@ module.exports = Discus.View;
 });
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{}],19:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v2.1.3
  * http://jquery.com/
@@ -20331,7 +20415,7 @@ return jQuery;
 
 }));
 
-},{}],20:[function(require,module,exports){
-arguments[4][16][0].apply(exports,arguments)
-},{"dup":16}]},{},[1])
+},{}],24:[function(require,module,exports){
+arguments[4][20][0].apply(exports,arguments)
+},{"dup":20}]},{},[1])
 

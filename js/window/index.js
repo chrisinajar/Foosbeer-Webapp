@@ -15,7 +15,6 @@ var Window = App.View.extend({
 	initialize: function() {
 		this.stateModel = this.createSharedStateModel('window');
 
-		console.log("I am a screen!");
 		this.header = new Header({
 			parent: this,
 			renderTo: '#window_header'
