@@ -24,7 +24,6 @@ window.require = function(name) {
 	}
 };
 
-
 // execute
 require('discus');
 require('bootstrap');

@@ -5,10 +5,11 @@ var Header = require('./header');
 
 var Window = App.View.extend({
 	template: _.template([
-		'<nav class="header" id="window_header">',
+		'<nav class="header navbar" id="window_header">',
 		'</nav>',
 		'<section>',
-			'Hey, this is a window!',
+			'<div class="container-fluid" id="window-viewport">',
+			'</div>',
 		'</section>'
 	].join('')),
 
@@ -19,6 +20,17 @@ var Window = App.View.extend({
 			parent: this,
 			renderTo: '#window_header'
 		});
+	},
+
+	setView: function(view) {
+		this.view = view;
+		view.setParent(this);
+		this.render();
+	},
+	onRender: function() {
+		if (this.view) {
+			this.view.renderTo(this.$("#window-viewport"));
+		}
 	}
 });
 

@@ -40,7 +40,7 @@ var rpcgw = App.rpcgw = {
 						deferr.reject(err);
 					} else {
 						console.log(details);
-						App.user = new User(details.user);
+						App.user = new User(data.user);
 
 						deferr.resolve(App.user);
 					}
@@ -60,7 +60,10 @@ var rpcgw = App.rpcgw = {
 
 		rpcgw.client.action(api, data, function(result) {
 			if (result.error) {
-				deff.reject(result.error);
+				if (result.message) {
+					console.warn("API error:", result.message);
+				}
+				deff.reject(result);
 			} else {
 				deff.resolve(result);
 			}

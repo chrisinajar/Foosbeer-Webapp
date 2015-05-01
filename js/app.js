@@ -6,6 +6,7 @@ App.Model = require('./common/model');
 App.Object = require('./common/object');
 App.Screen = require('./common/screen');
 App.View = require('./common/view');
+App.Router = require('./common/router');
 
 // quick reference to the global radio
 App.radio = require('backbone.radio');
@@ -14,7 +15,6 @@ window.App = App;
 
 App.addRouter = function(Type) {
 	var instance = new Type();
-	debugger;
 	App.router = instance; // fuckit
 
 	// do something with instance?

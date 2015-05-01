@@ -5,7 +5,32 @@ var User = App.Model.extend({
 		email: null,
 		mmr: 500,
 		name: "Full Name",
-		profile: {}
+		profile: {},
+		match_state: 'inactive'
+	},
+
+	createMatch: function() {
+		var self = this;
+		return App.rpcgw.get('matchCreate')
+			.fail(function(data) {
+				debugger;
+			})
+			.done(function(data) {
+				self.set({
+					match_state: 'active',
+					currentMatch: data.match
+				});
+			});
+	},
+	leaveMatch: function() {
+		var self = this;
+		return App.rpcgw.get('matchLeave')
+			.done(function(data) {
+				self.set({
+					match_state: 'inactive',
+					currentMatch: null
+				});
+			});
 	}
 
 });

@@ -13,8 +13,11 @@ rpcgw.init()
 		// people who use document ready are NERDS
 		$(function() {
 			Window.view.renderTo($('#view'));
+			App.window = Window.view;
 			// debugger;
-			App.router.history.start();
+			App.router.history.start({
+				pushState: false
+			});
 		});
 	})
 	.fail(function() {

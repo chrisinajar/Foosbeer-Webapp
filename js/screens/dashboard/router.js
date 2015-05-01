@@ -1,5 +1,5 @@
 var App = require('app');
-var Dashboard = require('./view');
+var Dashboard = require('./screen');
 
 var DashboardRouter = App.Router.extend({
 	routes: {
