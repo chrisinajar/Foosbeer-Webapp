@@ -5,8 +5,6 @@ var App = require('app');
 var rpcgw = require('./rpcgw');
 var Window = require('./window');
 
-require('./screens');
-
 rpcgw.init()
 	.done(function() {
 		// Queue up window to render async when the dom is done, it probably is already done, so this probably isn't async...

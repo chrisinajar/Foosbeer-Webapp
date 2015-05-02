@@ -27,3 +27,8 @@ window.require = function(name) {
 // execute
 require('discus');
 require('bootstrap');
+require('webcomponents.js');
+
+// our stuff
+require('./components');
+require('./screens');
