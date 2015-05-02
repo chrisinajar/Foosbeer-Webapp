@@ -49,6 +49,8 @@ var User = App.Model.extend({
 			});
 	}
 
+}, {
+	noun: 'user'
 });
 
 module.exports = User;

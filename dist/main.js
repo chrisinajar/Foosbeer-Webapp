@@ -139,14 +139,24 @@ App.registerElement('user-icon', UserIcon);
 
 },{"app":2,"underscore":76}],11:[function(require,module,exports){
 var App = require('app');
+var _ = require('underscore');
 
 var Match = App.Model.extend({
-
+	sit: function(options) {
+		var self = this;
+		return App.rpcgw.get('matchSit', options)
+			.done(function(data) {
+				debugger;
+				self.set(data.match);
+			});
+	}
+}, {
+	noun: 'match'
 });
 
 module.exports = Match;
 
-},{"app":2}],12:[function(require,module,exports){
+},{"app":2,"underscore":76}],12:[function(require,module,exports){
 var App = require('app');
 var Match = require('./match');
 
@@ -198,6 +208,8 @@ var User = App.Model.extend({
 			});
 	}
 
+}, {
+	noun: 'user'
 });
 
 module.exports = User;
@@ -259,6 +271,8 @@ var rpcgw = App.rpcgw = {
 	init: function() {
 		var deferr = new $.Deferred();
 
+		App.sync = rpcgw.sync;
+
 		App.apiServer = location.protocol+'//'+location.host + '/api/';
 		if (localStorage.foosbeer_apiserver) {
 			App.apiServer = localStorage.foosbeer_apiserver;
@@ -301,11 +315,11 @@ var rpcgw = App.rpcgw = {
 
 		rpcgw.client.action(api, data, function(result) {
 			if (result.error) {
-				if (result.message) {
-					console.warn("API error:", result.message);
-				}
+				console.warn("API error:", api, result.message || result.error);
+
 				deff.reject(result);
 			} else {
+				console.debug("API success:", api, result);
 				deff.resolve(result);
 			}
 		});
@@ -313,6 +327,42 @@ var rpcgw = App.rpcgw = {
 		promise = deff.promise();
 
 		return promise;
+	},
+
+	sync: function(action, model, options, errcb) {
+		var deferr = new $.Deferred(),
+			noun = model.constructor.noun;
+
+
+		if (typeof options == 'function') {
+			options = {
+				success: options,
+				error: errcb
+			};
+		}
+
+		function success(result) {
+			if (options.success) {
+				options.success(result);
+			}
+		}
+
+		function error(result) {
+			if (options.error) {
+				options.error(result);
+			}
+		}
+		switch (action) {
+			case "update": // save":
+				rpcgw.get(noun + 'Update', model.saveData ? model.saveData() : model.toJSON())
+					.done(deferr.resolve)
+					.fail(deferr.reject);
+
+		}
+
+		deferr.done(success).fail(error);
+
+		return deferr.promise();
 	}
 };
 
@@ -383,7 +433,24 @@ var _ = require('underscore');
 var MatchLobby = App.View.extend({
 	className: 'lobby',
 
-	view_template: _.template([
+	view_1v1_template: _.template([
+		'<div class="row">',
+			'<div class="col-xs-5">',
+				'<div class="row">',
+					'<user-icon />',
+				'</div>',
+			'</div>',
+			'<div class="col-xs-2">',
+			'</div>',
+			'<div class="col-xs-5">',
+				'<div class="row">',
+					'<user-icon />',
+				'</div>',
+			'</div>',
+		'</div>',
+	].join('')),
+
+	view_2v2_template: _.template([
 		'<div class="row">',
 			'<div class="col-xs-5">',
 				'<div class="row">',
@@ -406,48 +473,112 @@ var MatchLobby = App.View.extend({
 		'</div>',
 	].join('')),
 
-	selecting_template: _.template([
+	selecting_2v2_template: _.template([
 		'<div class="row">',
 			'<div class="col-xs-5">',
-				'<div class="row">',
-					'<div class="btn btn-default btn-large">Play Defense</div>',
-				'</div>',
-				'<div class="row">',
-					'<div class="btn btn-default btn-large">Play Offense</div>',
+				'<div class="btn-group-vertical">',
+					'<div class="btn btn-default btn-large joinYellowDefense">Play Defense</div>',
+					'<div class="btn btn-default btn-large joinYellowOffense">Play Offense</div>',
 				'</div>',
 			'</div>',
 			'<div class="col-xs-2">',
 			'</div>',
 			'<div class="col-xs-5">',
-				'<div class="row">',
-					'<div class="btn btn-default btn-large">Play Offense</div>',
-				'</div>',
-				'<div class="row">',
-					'<div class="btn btn-default btn-large">Play Defense</div>',
+				'<div class="btn-group-vertical">',
+					'<div class="btn btn-default btn-large joinBlackOffense">Play Offense</div>',
+					'<div class="btn btn-default btn-large joinBlackDefense">Play Defense</div>',
 				'</div>',
 			'</div>',
 		'</div>',
 	].join('')),
+
+	selecting_1v1_template: _.template([
+		'<div class="row">',
+			'<div class="col-xs-5">',
+				'<div class="btn-group-vertical">',
+					'<div class="btn btn-default btn-large joinYellowMixed">Yellow Team</div>',
+				'</div>',
+			'</div>',
+			'<div class="col-xs-2">',
+			'</div>',
+			'<div class="col-xs-5">',
+				'<div class="btn-group-vertical">',
+					'<div class="btn btn-default btn-large joinBlackMixed">Black Team</div>',
+				'</div>',
+			'</div>',
+		'</div>',
+	].join('')),
+
+	events: {
+		'click .joinYellowDefense': 'joinYellowDefense',
+		'click .joinYellowOffense': 'joinYellowOffense',
+		
+		'click .joinBlackDefense': 'joinBlackDefense',
+		'click .joinBlackOffense': 'joinBlackOffense',
+
+		'click .joinYellowMixed': 'joinYellowMixed',
+
+		'click .joinBlackMixed': 'joinBlackMixed',
+
+	},
+
+	modelEvents: {
+		'change:type': 'resetState'
+	},
 
 	stateModelEvents: {
+		'change:selecting': 'resetState',
 		'change:state': 'render'
 	},
 
 	initialize: function() {
-		this.stateModel = new App.Model({
-			state: 'view'
-		});
+		this.stateModel = new App.Model();
 		// our model is the actual match. conveeeenient!
+
+		this.resetState();
+	},
+
+	getTemplateData: function() {
+		var data = this._super("getTemplateData", arguments);
+
+		return data;
+	},
+
+
+	joinYellowDefense: function() {
+		this.model.sit({
+			team: 0,
+			position: 'defense',
+			player: App.user
+		});
+	},
+	joinYellowOffense: function() {
+	},
+	
+	joinBlackDefense: function() {
+	},
+	joinBlackOffense: function() {
+	},
+
+	joinYellowMixed: function() {
+	},
+
+	joinBlackMixed: function() {
 	},
 
 	selectSpot: function() {
 		this.stateModel.set({
-			state: 'selecting'
+			selecting: true
 		});
 	},
 	finishSelectingSpot: function() {
 		this.stateModel.set({
-			state: 'view'
+			selecting: false
+		});
+	},
+	resetState: function() {
+		this.stateModel.set({
+			state: (this.stateModel.get('selecting') ? 'selecting' : 'view') + '_' + this.model.get('type')
 		});
 	}
 });
@@ -460,6 +591,7 @@ var _ = require('underscore');
 var MatchLobby = require('./match_lobby');
 
 var MatchView = App.View.extend({
+	className: 'panel',
 	// we use different templates depending on what mode we're currently in
 	// this is maintained by stateModel.state
 	inactive_template: _.template([
@@ -467,10 +599,12 @@ var MatchView = App.View.extend({
 	].join('')),
 
 	active_template: _.template([
-		'<div class="btn-group btn-group-lg btn-group-justified">',
+		'<div class="btn-group btn-group-md btn-group-justified">',
 			'<div class="btn btn-default leaveMatch">Leave Match</div>',
+			'<div class="btn btn-default toggleMatchMode">Match Type</div>',
 			'<div class="btn btn-default selectSpot">Select Slot</div>',
 		'</div>',
+		'<br />',
 		'<div id="lobby"></div>'
 	].join('')),
 
@@ -485,7 +619,8 @@ var MatchView = App.View.extend({
 	events: {
 		'click .createMatch': 'createMatch',
 		'click .leaveMatch': 'leaveMatch',
-		'click .selectSpot': 'selectSpot'
+		'click .selectSpot': 'selectSpot',
+		'click .toggleMatchMode': 'toggleMatchMode'
 	},
 
 	initialize: function() {
@@ -510,6 +645,18 @@ var MatchView = App.View.extend({
 	},
 	selectSpot: function() {
 		this.lobby.selectSpot();
+	},
+	toggleMatchMode: function() {
+		var type = this.model.match.get('type');
+
+		if (type === '1v1') {
+			type = '2v2';
+		} else {
+			type = '1v1';
+		}
+		this.model.match.set({
+			type: type
+		});
 	},
 
 	resetState: function() {
