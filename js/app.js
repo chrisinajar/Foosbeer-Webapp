@@ -3,6 +3,8 @@ var App = require('discus').createClone();
 // expose common objects
 App.Collection = require('./common/collection');
 App.Model = require('./common/model');
+App.SocketCollection = require('./common/socketCollection');
+App.SocketModel = require('./common/socketModel');
 App.Object = require('./common/object');
 App.Screen = require('./common/screen');
 App.View = require('./common/view');

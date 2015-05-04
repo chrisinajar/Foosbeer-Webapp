@@ -28,6 +28,8 @@ window.require = function(name) {
 require('discus');
 require('bootstrap');
 require('webcomponents.js');
+require('backbone.iobind');
+require('backbone.iosync');
 
 // our stuff
 require('./components');

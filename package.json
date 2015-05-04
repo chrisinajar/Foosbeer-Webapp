@@ -51,8 +51,8 @@
   "browser": {
     "app": "./js/app.js",
     "bootstrap": "./node_modules/bootstrap/dist/js/bootstrap.js",
-    "backbone.iobind": "./node_modules/backbone.iobind/dist/backbone.iobind.min.js",
-    "backbone.iosync": "./node_modules/backbone.iobind/dist/backbone.iosync.min.js"
+    "backbone.iobind": "./node_modules/backbone.iobind/dist/backbone.iobind.js",
+    "backbone.iosync": "./node_modules/backbone.iobind/dist/backbone.iosync.js"
   },
   "browserify": {
     "transform": [
