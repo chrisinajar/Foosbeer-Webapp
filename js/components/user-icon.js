@@ -8,6 +8,10 @@ var UserIcon = App.View.extend({
 
 	initialize: function() {
 		console.log("I'm an icon!");
+	},
+
+	render: function() {
+		debugger;
 	}
 });
 

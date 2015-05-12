@@ -188,7 +188,14 @@ App.registerElement = function(tag, Type) {
 	return document.registerElement(tag, {
 		prototype: Object.create(HTMLElement.prototype, {
 			createdCallback: cb(function() {
+				var parentView = App.viewByCID($(this).closest('[data-cid]').data('cid')),
+					modelKey = $(this).attr('model-key'),
+					model = modelKey ? parentView._templateData[modelKey] : parentView.model;
+
 				this.backboneView = new Type({
+					parent: parentView,
+
+					model: model,
 					component: this
 				});
 			}),
@@ -214,6 +221,10 @@ var UserIcon = App.View.extend({
 
 	initialize: function() {
 		console.log("I'm an icon!");
+	},
+
+	render: function() {
+		debugger;
 	}
 });
 
@@ -224,6 +235,28 @@ var App = require('app');
 var _ = require('underscore');
 
 var Match = App.Model.extend({
+	initialize: function() {
+		this.players = new App.Collection(this.get('players'), {
+			model: require('./user')
+		});
+	},
+	parse: function() {
+		var data = this._super("parse", arguments);
+
+		this.players.reset(data.players);
+
+		return data;
+	},
+	getPlayer: function(team, position) {
+		var result = this.players.find(function(player) {
+			if (position && player.get('position') !== position) {
+				return false;
+			}
+			return player.get('team') === team;
+		});
+		debugger;
+		return result;
+	},
 	sit: function(options) {
 		var self = this;
 		return App.rpcgw.get('matchSit', options)
@@ -237,7 +270,7 @@ var Match = App.Model.extend({
 
 module.exports = Match;
 
-},{"app":2,"underscore":82}],14:[function(require,module,exports){
+},{"./user":14,"app":2,"underscore":82}],14:[function(require,module,exports){
 var App = require('app');
 var Match = require('./match');
 
@@ -520,14 +553,14 @@ var MatchLobby = App.View.extend({
 		'<div class="row">',
 			'<div class="col-xs-5">',
 				'<div class="row">',
-					'<user-icon />',
+					'<user-icon model-key="playerOne" />',
 				'</div>',
 			'</div>',
 			'<div class="col-xs-2">',
 			'</div>',
 			'<div class="col-xs-5">',
 				'<div class="row">',
-					'<user-icon />',
+					'<user-icon model-key="playerTwo" />',
 				'</div>',
 			'</div>',
 		'</div>',
@@ -537,20 +570,20 @@ var MatchLobby = App.View.extend({
 		'<div class="row">',
 			'<div class="col-xs-5">',
 				'<div class="row">',
-					'<user-icon />',
+					'<user-icon model-key="playerOneDefense" />',
 				'</div>',
 				'<div class="row">',
-					'<user-icon />',
+					'<user-icon model-key="playerOneOffense" />',
 				'</div>',
 			'</div>',
 			'<div class="col-xs-2">',
 			'</div>',
 			'<div class="col-xs-5">',
 				'<div class="row">',
-					'<user-icon />',
+					'<user-icon model-key="playerTwoOffense" />',
 				'</div>',
 				'<div class="row">',
-					'<user-icon />',
+					'<user-icon model-key="playerTwoDefense" />',
 				'</div>',
 			'</div>',
 		'</div>',
@@ -623,6 +656,19 @@ var MatchLobby = App.View.extend({
 
 	getTemplateData: function() {
 		var data = this._super("getTemplateData", arguments);
+
+		switch (data.type) {
+			case "1v1":
+				data.playerOne = this.model.getPlayer(0);
+				data.playerTwo = this.model.getPlayer(1);
+				break;
+			case "2v2":
+				data.playerOneOffense = this.model.getPlayer(0, "offense");
+				data.playerOneDefense = this.model.getPlayer(0, "defense");
+				data.playerTwoOffense = this.model.getPlayer(1, "offense");
+				data.playerTwoDefense = this.model.getPlayer(1, "defense");
+				break;
+		}
 
 		return data;
 	},
@@ -13607,6 +13653,7 @@ Discus.ListView = Discus.View.extend({
 			this.renderModels = _.debounce(this.renderModels);
 			this.selectedChanged = _.debounce(this.selectedChanged);
 			this.handleScroll = _.debounce(this.handleScroll, 10);
+			this.render = _.debounce(this.render);
 		}
 
 		_.bindAll(this, 'refilter', 'resort', 'resetCollection', 'renderModels');
@@ -13699,15 +13746,23 @@ Discus.ListView = Discus.View.extend({
 		if (this.$el.parent().length) {
 			this.rebuildDOM();
 		}
+		// if we're not, we just kinda don't worry about it..
+		// we'll be rendered again next time we're added to the dom
 	},
 	// this deconstructs and reconstructs the DOM
 	// it can be kind of heavy, but generally is a good operation
 	// it's somewhat important to run this at least the first time we're actually attached to the dom
 	// (and all subsequent renders where we're attached to a fresh unmodified dom)
 	rebuildDOM: function() {
+		if (this.options.sparse) {
+			if (!this.sparse.scrollParent || !this.sparse.scrollParent.length) {
+				this.generateSparseRenderTarget();
+			}
+		}
 		var target = this.getRenderTarget();
 
 		// Start!
+		// renderAttached is handled within detach/attach dom...
 		this.detachDOM();
 
 		// tear everything down first..
@@ -13729,10 +13784,6 @@ Discus.ListView = Discus.View.extend({
 			this.sparse.holder.attr('class', 'list_view_slider ' + this.options.sparseClassName);
 		}
 
-		if (this.options.renderAttached) {
-			this.attachDOM();
-		}
-
 		if (this.isLoading()) {
 			this._d.loadingSpinnerShown = true;
 			this.renderLoading();
@@ -13750,9 +13801,7 @@ Discus.ListView = Discus.View.extend({
 			this.renderFooter();
 		}
 
-		if (!this.options.renderAttached) {
-			this.attachDOM();
-		}
+		this.attachDOM();
 
 		// Done!
 	},
@@ -13821,7 +13870,7 @@ Discus.ListView = Discus.View.extend({
 			return;
 		}
 
-		if (this.placeHolder.parent().length) {
+		if (this.placeHolder && this.placeHolder.parent().length) {
 			this.$el.insertAfter(this.placeHolder);
 		} else {
 			///TODO This case doesn't render properly!?
@@ -14002,6 +14051,16 @@ Discus.ListView = Discus.View.extend({
 			console.log("Rendering views based on offset,", offset);
 			renderList = _d.listCache.slice(offset, offset + this.options.sparseLimit);
 
+			if (_d.renderedViews.length === 0 && self.options.sparse && !self.sparse.rowHeight && renderList.length > 0) {
+				self.getView(renderList[0].m).renderTo(this.$el);
+				_d.renderedViews.push(self.getView(renderList[0].m));
+
+				this.updateSparseSizing();
+
+				_d.renderedViews = [];
+				self.getView(renderList[0].m)
+			}
+
 			this.resetSparsePosition();
 			// setup the height so that we fill up enough space..
 			this.$el.css({
@@ -14135,7 +14194,7 @@ Discus.ListView = Discus.View.extend({
 							if (viewOffset === 0) {
 								_d.renderedViews[viewOffset].$el.prependTo(target);
 							} else {
-								_d.renderedViews[viewOffset].$el.insertAfter(_d.renderedViews[viewOffset-1].$el);
+								_d.renderedViews[viewOffset].$el.insertAfter(_d.renderedViews[viewOffset-1].lastElement());
 							}
 							// render is done below, so you don't need to here
 							return;
@@ -14193,7 +14252,7 @@ Discus.ListView = Discus.View.extend({
 					console.log("Completing canceled render...", viewOffset);
 				}
 				return;
-			}
+			}	
 			_d.isRendering = false;
 			self.removeFooter();
 			self.renderFooter();
@@ -14211,6 +14270,7 @@ Discus.ListView = Discus.View.extend({
 			this.tableLoadingSpinner = null;
 		}
 		if (!lastView) {
+			this.getRenderTarget().empty();
 			return;
 		}
 
@@ -14370,7 +14430,7 @@ Discus.ListView = Discus.View.extend({
 
 		return sparse.holder;
 	},
-	handleScroll: function() {
+	handleScroll: ASYNC(function() {
 		if (!this.sparse.rowHeight) {
 			this.updateSparseSizing();
 		}
@@ -14451,7 +14511,7 @@ Discus.ListView = Discus.View.extend({
 					(function(t) {
 						rejects = _d.renderedViews;
 						_d.renderedViews = t;
-					}(rejects))
+					}(rejects));
 				}
 
 				this.resetSparsePosition();
@@ -14465,7 +14525,7 @@ Discus.ListView = Discus.View.extend({
 
 			this.renderModels();
 		}
-	},
+	}),
 
 	resetSparsePosition: function() {
 		this.getRenderTarget().css({
@@ -14504,11 +14564,14 @@ Discus.ListView = Discus.View.extend({
 		if (!this.options.sparse) {
 			return;
 		}
+		if (!this.sparse.scrollParent || !this.sparse.scrollParent.length) {
+			this.generateSparseRenderTarget();
+			if (!this.sparse.scrollParent) {
+				return;
+			}
+		}
 		if (this._d.renderedViews.length === 0) {
 			return;
-		}
-		if (!this.sparse.scrollParent || !this.sparse.scrollParent.length) {
-			return this.generateSparseRenderTarget();
 		}
 		// this.sparse.holder.css({
 		// 	height: 'auto'
@@ -14530,6 +14593,8 @@ Discus.ListView = Discus.View.extend({
 
 			this.sparse.scrollHeightOffset = this.sparse.holder.offset().top - (this.sparse.scrollParent.offset() ? this.sparse.scrollParent.offset().top : 0);
 		}
+		// debugger;
+		// this.resetCollection();
 	},
 
 	addLoadingPromise: function(promise) {
@@ -14748,8 +14813,6 @@ Discus.ListView = Discus.View.extend({
 
 
 
-
-
 	/********************************************
 	*											*
 	*			SELECTION FUNCTIONS				*
@@ -14789,7 +14852,7 @@ Discus.ListView = Discus.View.extend({
 			currentRow = currentRow[0];
 		}
 
-		if (currentRow && !_.any(listCache, function(cache) { return cache.m.cid === currentRow.cid })) {
+		if (currentRow && !_.any(listCache, function(cache) { return cache.m.cid === currentRow.cid; })) {
 			currentRow = null;
 		}
 
@@ -15246,12 +15309,24 @@ var $ = _dereq_("jquery");
 
 var needsConfigureShim = Discus.VERSION_ARRAY[0] >= 1 && Discus.VERSION_ARRAY[1] >= 1;
 
+var viewByCID = {};
+
+Discus.viewByCID = function(cid) {
+	return viewByCID[cid] || null; // no undefined pls
+};
+
 Discus.View = function(options) {
 	if (needsConfigureShim) {
 		this.options = options;
 	}
 	Backbone.View.apply(this, arguments);
+	// setup cid
+	this.$el.attr({
+		'data-cid': this.cid
+	});
 	this.discusInitialize();
+
+	viewByCID[this.cid] = this;
 };
 Discus.View.prototype = Backbone.View.prototype;
 Discus.View.extend = Backbone.View.extend;
@@ -15408,6 +15483,60 @@ Discus.View = Discus.View.extend({
 		} else {
 			return this.createSharedStateModel(name);
 		}
+	},
+
+	// track el as part of this view even though it's not a child..
+	addElement: function(el) {
+		var self = this,
+			$el = $(el);
+
+		if ($el.length > 1) {
+			$el.each(function() {
+				self.addElement(this);
+			});
+		} else if ($el.length === 0) {
+			throw new Error("Invalid element!");
+		}
+
+		if (this.$el.closest($el).length) {
+			throw new Error("Element is a child of this view. This is only for unrelated elements");
+		}
+		if ($el.closest(this.$el).length) {
+			throw new Error("Element is an ancestor of this view! Reconsider how you're using this view.");
+		}
+
+		// normalize
+		el = $el.get(0);
+
+		if (!this._trackedElements) {
+			this._trackedElements = [];
+		}
+		_(this._trackedElements).each(function(otherEl) {
+			var $otherEl = $(otherEl);
+
+			if ($otherEl.closest($el).length) {
+				throw new Error("Element is a child of another tracked element. This will cause problems.");
+			}
+			if ($el.closest($otherEl).length) {
+				throw new Error("Element is an ancestor of another tracked element. This will cause problems.");
+			}
+		});
+		this._trackedElements.push(el);
+	},
+	lastElement: function() {
+		// get the lastmost element, for appending things after other views
+		var curEl = this.$el;
+
+		// should this recurse? I DONT KNOW!?!?!?
+		_(this._trackedElements).each(function(el) {
+			var $el = $(el);
+
+			if (curEl.nextAll().is($el)) {
+				curEl = $el;
+			}
+		});
+
+		return curEl;
 	},
 
 	clearTimeout: function(timerID) {
@@ -15569,9 +15698,16 @@ Discus.View = Discus.View.extend({
 	render: function() {
 		var data, state;
 
+		// ensure cid!.. prooooobably redundant
+		this.$el.attr({
+			'data-cid': this.cid
+		});
+
 		this.onBeforeRender();
 
 		data = this.getTemplateData();
+		this._templateData = data;
+
 		// even if we use custom data getter we still might need state data to decide which template to use
 		if (this.stateModel) {
 			state = this.stateModel.toJSON();
@@ -15619,6 +15755,9 @@ Discus.View = Discus.View.extend({
 			return;
 		}
 		this.$el.detach();
+		_(this._trackedElements).each(function(el) {
+			$(el).detach();
+		});
 	},
 	remove: function() {
 		var self = this,
@@ -15637,6 +15776,7 @@ Discus.View = Discus.View.extend({
 		$(document).off('.' + cid);
 		$(window).off('.' + cid);
 		_(this.__timerIDS).each(clearTimeout);
+		delete viewByCID[cid];
 
 		this.undelegateEvents();
 		this.stopListening();

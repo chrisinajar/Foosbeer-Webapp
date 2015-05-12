@@ -8,14 +8,14 @@ var MatchLobby = App.View.extend({
 		'<div class="row">',
 			'<div class="col-xs-5">',
 				'<div class="row">',
-					'<user-icon />',
+					'<user-icon model-key="playerOne" />',
 				'</div>',
 			'</div>',
 			'<div class="col-xs-2">',
 			'</div>',
 			'<div class="col-xs-5">',
 				'<div class="row">',
-					'<user-icon />',
+					'<user-icon model-key="playerTwo" />',
 				'</div>',
 			'</div>',
 		'</div>',
@@ -25,20 +25,20 @@ var MatchLobby = App.View.extend({
 		'<div class="row">',
 			'<div class="col-xs-5">',
 				'<div class="row">',
-					'<user-icon />',
+					'<user-icon model-key="playerOneDefense" />',
 				'</div>',
 				'<div class="row">',
-					'<user-icon />',
+					'<user-icon model-key="playerOneOffense" />',
 				'</div>',
 			'</div>',
 			'<div class="col-xs-2">',
 			'</div>',
 			'<div class="col-xs-5">',
 				'<div class="row">',
-					'<user-icon />',
+					'<user-icon model-key="playerTwoOffense" />',
 				'</div>',
 				'<div class="row">',
-					'<user-icon />',
+					'<user-icon model-key="playerTwoDefense" />',
 				'</div>',
 			'</div>',
 		'</div>',
@@ -111,6 +111,19 @@ var MatchLobby = App.View.extend({
 
 	getTemplateData: function() {
 		var data = this._super("getTemplateData", arguments);
+
+		switch (data.type) {
+			case "1v1":
+				data.playerOne = this.model.getPlayer(0);
+				data.playerTwo = this.model.getPlayer(1);
+				break;
+			case "2v2":
+				data.playerOneOffense = this.model.getPlayer(0, "offense");
+				data.playerOneDefense = this.model.getPlayer(0, "defense");
+				data.playerTwoOffense = this.model.getPlayer(1, "offense");
+				data.playerTwoDefense = this.model.getPlayer(1, "defense");
+				break;
+		}
 
 		return data;
 	},
