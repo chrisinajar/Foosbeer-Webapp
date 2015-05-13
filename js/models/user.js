@@ -10,6 +10,8 @@ var User = App.Model.extend({
 		match_state: 'inactive'
 	},
 
+	urlRoot: 'user',
+
 	initialize: function() {
 		this.match = new Match(this.attributes.currentMatch);
 	},

@@ -26,6 +26,7 @@ var rpcgw = App.rpcgw = {
 		}
 
 		rpcgw.client = new actionheroClient();
+		window.socket = rpcgw.client;
 		rpcgw.client.on('connected', function() {
 			console.log("Connected to action hero!");
 		});
@@ -99,11 +100,24 @@ var rpcgw = App.rpcgw = {
 				options.error(result);
 			}
 		}
+		function parseResult(noun, cb) {
+			return function(result) {
+				cb(result[noun] || result.value || result);
+			}
+		}
 		switch (action) {
 			case "update": // save":
 				rpcgw.get(noun + 'Update', model.saveData ? model.saveData() : model.toJSON())
-					.done(deferr.resolve)
+					.done(parseResult(noun, deferr.resolve))
 					.fail(deferr.reject);
+				break;
+			case "read":
+				rpcgw.get(noun, model.saveData ? model.saveData() : model.toJSON())
+					.done(parseResult(noun, deferr.resolve))
+					.fail(deferr.reject);
+				break;
+			default:
+				debugger;
 
 		}
 

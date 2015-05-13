@@ -1,4 +1,5 @@
 user-icon {
+	position: relative;
 	display: inline-block;
 	width: 100px;
 	height: 100px;
@@ -6,7 +7,11 @@ user-icon {
 	border: 2px solid black;
 	border-radius: 50%;
 
-	background-repeat: none;
-	background-size: cover;
-	background-position: center center;
+	overflow: hidden;
+
+	img {
+		width: 100%;
+		height: auto;
+	}
+
 }

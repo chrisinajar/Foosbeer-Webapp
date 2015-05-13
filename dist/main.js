@@ -25,7 +25,7 @@ rpcgw.init()
 		location.href = "/login.html";
 	});
 
-},{"./plugins":15,"./rpcgw":16,"./window":24,"app":2}],2:[function(require,module,exports){
+},{"./plugins":16,"./rpcgw":17,"./window":25,"app":2}],2:[function(require,module,exports){
 var App = require('discus').createClone();
 
 // expose common objects
@@ -83,7 +83,7 @@ App.Router = Router;
 
 module.exports = Router;
 
-},{"ampersand-router":26,"app":2}],7:[function(require,module,exports){
+},{"ampersand-router":27,"app":2}],7:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.Screen.extend({
@@ -133,7 +133,6 @@ var _ = require('lodash');
 
 module.exports = Model.extend({
 	noIoBind: false,
-	socket: window.socket,
 	initialize: function () {
 		_.bindAll(this, 'serverChange', 'serverDelete', 'modelCleanup');
 
@@ -216,15 +215,34 @@ var _ = require('underscore');
 
 var UserIcon = App.View.extend({
 	template: _.template([
-		'Hey!!'
+		'<img src="<%- url %>" />'
 	].join('')),
 
-	initialize: function() {
-		console.log("I'm an icon!");
+	modelEvents: {
+		"change:profile": "render"
 	},
 
-	render: function() {
-		debugger;
+	initialize: function() {
+		if (this.model && _(this.model.get('profile')).isEmpty()) {
+			this.model.fetch();
+		}
+	},
+
+	getTemplateData: function() {
+		var data = this._super("getTemplateData", arguments);
+
+		data.url = null;
+
+		if (data.profile && data.profile._json) {
+			if (data.profile._json.avatar_url) {
+				data.url = data.profile._json.avatar_url;
+			} else {
+				// what's your avatar?
+				debugger;
+			}
+		}
+
+		return data;
 	}
 });
 
@@ -237,24 +255,25 @@ var _ = require('underscore');
 var Match = App.Model.extend({
 	initialize: function() {
 		this.players = new App.Collection(this.get('players'), {
-			model: require('./user')
+			model: require('./matchPlayer')
 		});
+
+		this.listenTo(this, "change:players", this.resetPlayers);
 	},
-	parse: function() {
-		var data = this._super("parse", arguments);
-
-		this.players.reset(data.players);
-
-		return data;
+	resetPlayers: function() {
+		this.players.reset(this.get('players'));
 	},
 	getPlayer: function(team, position) {
+		var matchPlayer = this.getMatchPlayer(team, position);
+		return matchPlayer ? matchPlayer.user : null;
+	},
+	getMatchPlayer: function(team, position) {		
 		var result = this.players.find(function(player) {
 			if (position && player.get('position') !== position) {
 				return false;
 			}
 			return player.get('team') === team;
 		});
-		debugger;
 		return result;
 	},
 	sit: function(options) {
@@ -270,7 +289,44 @@ var Match = App.Model.extend({
 
 module.exports = Match;
 
-},{"./user":14,"app":2,"underscore":82}],14:[function(require,module,exports){
+},{"./matchPlayer":14,"app":2,"underscore":82}],14:[function(require,module,exports){
+var App = require('app');
+var _ = require('underscore');
+var User = require('./user');
+
+// match player model is for players in the match. This contains team and type and player, exposes player as a model
+
+module.exports = App.Model.extend({
+	initialize: function() {
+		this.resetUser();
+	},
+	parse: function() {
+		var data = this._super("parse", arguments);
+
+		this.resetUser();
+
+		return data;
+	},
+	resetUser: function() {
+		var playerData = this.get('player');
+		if (typeof playerData !== 'object') {
+			playerData = {
+				_id: playerData
+			};
+		}
+		if (!this.user) {
+			this.user = new User(playerData);
+		} else {
+			this.user.reset(playerData);
+		}
+
+		if (_(this.user.get('profile')).isEmpty()) {
+			this.user.fetch();
+		}
+	}
+});
+
+},{"./user":15,"app":2,"underscore":82}],15:[function(require,module,exports){
 var App = require('app');
 var Match = require('./match');
 
@@ -282,6 +338,8 @@ var User = App.Model.extend({
 		profile: {},
 		match_state: 'inactive'
 	},
+
+	urlRoot: 'user',
 
 	initialize: function() {
 		this.match = new Match(this.attributes.currentMatch);
@@ -328,7 +386,7 @@ var User = App.Model.extend({
 
 module.exports = User;
 
-},{"./match":13,"app":2}],15:[function(require,module,exports){
+},{"./match":13,"app":2}],16:[function(require,module,exports){
 // External stuff. don't load local modules here..
 
 // global
@@ -360,13 +418,12 @@ require('discus');
 require('bootstrap');
 require('webcomponents.js');
 require('backbone.iobind');
-require('backbone.iosync');
 
 // our stuff
 require('./components');
 require('./screens');
 
-},{"./components":11,"./screens":22,"backbone":75,"backbone.iobind":71,"backbone.iosync":72,"bootstrap":77,"discus":78,"jquery":79,"underscore":82,"webcomponents.js":83}],16:[function(require,module,exports){
+},{"./components":11,"./screens":23,"backbone":75,"backbone.iobind":72,"bootstrap":77,"discus":78,"jquery":79,"underscore":82,"webcomponents.js":83}],17:[function(require,module,exports){
 // rpcgw. handle login, rely on static login page for login
 var App = require('app');
 var User = require('./models/user');
@@ -395,6 +452,7 @@ var rpcgw = App.rpcgw = {
 		}
 
 		rpcgw.client = new actionheroClient();
+		window.socket = rpcgw.client;
 		rpcgw.client.on('connected', function() {
 			console.log("Connected to action hero!");
 		});
@@ -468,11 +526,24 @@ var rpcgw = App.rpcgw = {
 				options.error(result);
 			}
 		}
+		function parseResult(noun, cb) {
+			return function(result) {
+				cb(result[noun] || result.value || result);
+			}
+		}
 		switch (action) {
 			case "update": // save":
 				rpcgw.get(noun + 'Update', model.saveData ? model.saveData() : model.toJSON())
-					.done(deferr.resolve)
+					.done(parseResult(noun, deferr.resolve))
 					.fail(deferr.reject);
+				break;
+			case "read":
+				rpcgw.get(noun, model.saveData ? model.saveData() : model.toJSON())
+					.done(parseResult(noun, deferr.resolve))
+					.fail(deferr.reject);
+				break;
+			default:
+				debugger;
 
 		}
 
@@ -484,14 +555,14 @@ var rpcgw = App.rpcgw = {
 
 module.exports = App.rpcgw;
 
-},{"./models/user":14,"app":2}],17:[function(require,module,exports){
+},{"./models/user":15,"app":2}],18:[function(require,module,exports){
 var App = require('app');
 
 App.addRouter(require('./router'));
 
 // should this really exist?
 
-},{"./router":18,"app":2}],18:[function(require,module,exports){
+},{"./router":19,"app":2}],19:[function(require,module,exports){
 var App = require('app');
 var Dashboard = require('./screen');
 
@@ -514,7 +585,7 @@ var DashboardRouter = App.Router.extend({
 
 module.exports = DashboardRouter;
 
-},{"./screen":19,"app":2}],19:[function(require,module,exports){
+},{"./screen":20,"app":2}],20:[function(require,module,exports){
 var App = require('app');
 var _ = require('underscore');
 var MatchView = require('./views/match_view');
@@ -542,7 +613,7 @@ var Dashboard = App.Screen.extend({
 
 module.exports = Dashboard;
 
-},{"./views/match_view":21,"app":2,"underscore":82}],20:[function(require,module,exports){
+},{"./views/match_view":22,"app":2,"underscore":82}],21:[function(require,module,exports){
 var App = require('app');
 var _ = require('underscore');
 
@@ -674,41 +745,47 @@ var MatchLobby = App.View.extend({
 	},
 
 
+	sit: function(options) {
+		var self = this;
+
+		this.model.sit(options)
+			.done(this.finishSelectingSpot.bind(this));
+	},
 	joinYellowDefense: function() {
-		this.model.sit({
+		this.sit({
 			team: 0,
 			position: 'defense'
 		});
 	},
 	joinYellowOffense: function() {
-		this.model.sit({
+		this.sit({
 			team: 0,
 			position: 'offense'
 		});
 	},
 	
 	joinBlackDefense: function() {
-		this.model.sit({
+		this.sit({
 			team: 1,
 			position: 'defense'
 		});
 	},
 	joinBlackOffense: function() {
-		this.model.sit({
+		this.sit({
 			team: 1,
 			position: 'offense'
 		});
 	},
 
 	joinYellowMixed: function() {
-		this.model.sit({
+		this.sit({
 			team: 0,
 			position: 'mixed'
 		});
 	},
 
 	joinBlackMixed: function() {
-		this.model.sit({
+		this.sit({
 			team: 1,
 			position: 'mixed'
 		});
@@ -733,7 +810,7 @@ var MatchLobby = App.View.extend({
 
 module.exports = MatchLobby;
 
-},{"app":2,"underscore":82}],21:[function(require,module,exports){
+},{"app":2,"underscore":82}],22:[function(require,module,exports){
 var App = require('app');
 var _ = require('underscore');
 var MatchLobby = require('./match_lobby');
@@ -805,6 +882,7 @@ var MatchView = App.View.extend({
 		this.model.match.set({
 			type: type
 		});
+		this.model.match.save();
 	},
 
 	resetState: function() {
@@ -816,12 +894,12 @@ var MatchView = App.View.extend({
 
 module.exports = MatchView;
 
-},{"./match_lobby":20,"app":2,"underscore":82}],22:[function(require,module,exports){
+},{"./match_lobby":21,"app":2,"underscore":82}],23:[function(require,module,exports){
 //include screens here!
 
 require('./dashboard');
 
-},{"./dashboard":17}],23:[function(require,module,exports){
+},{"./dashboard":18}],24:[function(require,module,exports){
 var App = require('app');
 var _ = require('underscore');
 
@@ -923,7 +1001,7 @@ var Header = App.View.extend({
 });
 
 module.exports = Header;
-},{"app":2,"underscore":82}],24:[function(require,module,exports){
+},{"app":2,"underscore":82}],25:[function(require,module,exports){
 var App = require('app');
 var _ = require('underscore');
 
@@ -965,7 +1043,7 @@ module.exports = {
 	view: new Window()
 };
 
-},{"./header":23,"app":2,"underscore":82}],25:[function(require,module,exports){
+},{"./header":24,"app":2,"underscore":82}],26:[function(require,module,exports){
 var Events = require('ampersand-events');
 var extend = require('lodash.assign');
 var bind = require('lodash.bind');
@@ -1202,7 +1280,7 @@ extend(History.prototype, Events, {
 
 module.exports = new History();
 
-},{"ampersand-events":28,"lodash.assign":46,"lodash.bind":57}],26:[function(require,module,exports){
+},{"ampersand-events":29,"lodash.assign":47,"lodash.bind":58}],27:[function(require,module,exports){
 ;if (typeof window !== "undefined") {  window.ampersand = window.ampersand || {};  window.ampersand["ampersand-router"] = window.ampersand["ampersand-router"] || [];  window.ampersand["ampersand-router"].push("3.0.2");}
 var classExtend = require('ampersand-class-extend');
 var Events = require('ampersand-events');
@@ -1328,7 +1406,7 @@ extend(Router.prototype, Events, {
 
 Router.extend = classExtend;
 
-},{"./ampersand-history":25,"ampersand-class-extend":27,"ampersand-events":28,"lodash.assign":46,"lodash.isfunction":63,"lodash.isregexp":64,"lodash.result":65}],27:[function(require,module,exports){
+},{"./ampersand-history":26,"ampersand-class-extend":28,"ampersand-events":29,"lodash.assign":47,"lodash.isfunction":64,"lodash.isregexp":65,"lodash.result":66}],28:[function(require,module,exports){
 var assign = require('lodash.assign');
 
 /// Following code is largely pasted from Backbone.js
@@ -1377,7 +1455,7 @@ var extend = function(protoProps) {
 // Expose the extend function
 module.exports = extend;
 
-},{"lodash.assign":46}],28:[function(require,module,exports){
+},{"lodash.assign":47}],29:[function(require,module,exports){
 ;if (typeof window !== "undefined") {  window.ampersand = window.ampersand || {};  window.ampersand["ampersand-events"] = window.ampersand["ampersand-events"] || [];  window.ampersand["ampersand-events"].push("1.1.1");}
 var runOnce = require('lodash.once');
 var uniqueId = require('lodash.uniqueid');
@@ -1560,7 +1638,7 @@ Events.listenToAndRun = function (obj, name, callback) {
 
 module.exports = Events;
 
-},{"lodash.assign":46,"lodash.bind":57,"lodash.foreach":29,"lodash.isempty":34,"lodash.keys":38,"lodash.once":42,"lodash.uniqueid":44}],29:[function(require,module,exports){
+},{"lodash.assign":47,"lodash.bind":58,"lodash.foreach":30,"lodash.isempty":35,"lodash.keys":39,"lodash.once":43,"lodash.uniqueid":45}],30:[function(require,module,exports){
 /**
  * lodash 3.0.3 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -1624,7 +1702,7 @@ var forEach = createForEach(arrayEach, baseEach);
 
 module.exports = forEach;
 
-},{"lodash._arrayeach":30,"lodash._baseeach":31,"lodash._bindcallback":32,"lodash.isarray":33}],30:[function(require,module,exports){
+},{"lodash._arrayeach":31,"lodash._baseeach":32,"lodash._bindcallback":33,"lodash.isarray":34}],31:[function(require,module,exports){
 /**
  * lodash 3.0.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -1657,7 +1735,7 @@ function arrayEach(array, iteratee) {
 
 module.exports = arrayEach;
 
-},{}],31:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 /**
  * lodash 3.0.3 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -1840,7 +1918,7 @@ function isObject(value) {
 
 module.exports = baseEach;
 
-},{"lodash.keys":38}],32:[function(require,module,exports){
+},{"lodash.keys":39}],33:[function(require,module,exports){
 /**
  * lodash 3.0.1 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -1907,7 +1985,7 @@ function identity(value) {
 
 module.exports = bindCallback;
 
-},{}],33:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 /**
  * lodash 3.0.2 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -2067,7 +2145,7 @@ function escapeRegExp(string) {
 
 module.exports = isArray;
 
-},{}],34:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 /**
  * lodash 3.0.2 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -2178,7 +2256,7 @@ function isEmpty(value) {
 
 module.exports = isEmpty;
 
-},{"lodash.isarguments":35,"lodash.isarray":36,"lodash.isfunction":63,"lodash.isstring":37,"lodash.keys":38}],35:[function(require,module,exports){
+},{"lodash.isarguments":36,"lodash.isarray":37,"lodash.isfunction":64,"lodash.isstring":38,"lodash.keys":39}],36:[function(require,module,exports){
 /**
  * lodash 3.0.1 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -2253,9 +2331,9 @@ function isArguments(value) {
 
 module.exports = isArguments;
 
-},{}],36:[function(require,module,exports){
-arguments[4][33][0].apply(exports,arguments)
-},{"dup":33}],37:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
+arguments[4][34][0].apply(exports,arguments)
+},{"dup":34}],38:[function(require,module,exports){
 /**
  * lodash 3.0.1 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -2310,7 +2388,7 @@ function isString(value) {
 
 module.exports = isString;
 
-},{}],38:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 /**
  * lodash 3.0.6 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -2551,11 +2629,11 @@ function keysIn(object) {
 
 module.exports = keys;
 
-},{"lodash.isarguments":39,"lodash.isarray":40,"lodash.isnative":41}],39:[function(require,module,exports){
-arguments[4][35][0].apply(exports,arguments)
-},{"dup":35}],40:[function(require,module,exports){
-arguments[4][33][0].apply(exports,arguments)
-},{"dup":33}],41:[function(require,module,exports){
+},{"lodash.isarguments":40,"lodash.isarray":41,"lodash.isnative":42}],40:[function(require,module,exports){
+arguments[4][36][0].apply(exports,arguments)
+},{"dup":36}],41:[function(require,module,exports){
+arguments[4][34][0].apply(exports,arguments)
+},{"dup":34}],42:[function(require,module,exports){
 /**
  * lodash 3.0.2 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -2672,7 +2750,7 @@ function escapeRegExp(string) {
 
 module.exports = isNative;
 
-},{}],42:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 /**
  * lodash 3.0.1 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -2706,7 +2784,7 @@ function once(func) {
 
 module.exports = once;
 
-},{"lodash.before":43}],43:[function(require,module,exports){
+},{"lodash.before":44}],44:[function(require,module,exports){
 /**
  * lodash 3.0.2 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -2759,7 +2837,7 @@ function before(n, func) {
 
 module.exports = before;
 
-},{}],44:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 /**
  * lodash 3.0.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -2796,7 +2874,7 @@ function uniqueId(prefix) {
 
 module.exports = uniqueId;
 
-},{"lodash._basetostring":45}],45:[function(require,module,exports){
+},{"lodash._basetostring":46}],46:[function(require,module,exports){
 /**
  * lodash 3.0.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -2823,7 +2901,7 @@ function baseToString(value) {
 
 module.exports = baseToString;
 
-},{}],46:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 /**
  * lodash 3.1.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -2987,7 +3065,7 @@ function constant(value) {
 
 module.exports = assign;
 
-},{"lodash._baseassign":47,"lodash._createassigner":49,"lodash.isnative":53,"lodash.keys":54}],47:[function(require,module,exports){
+},{"lodash._baseassign":48,"lodash._createassigner":50,"lodash.isnative":54,"lodash.keys":55}],48:[function(require,module,exports){
 /**
  * lodash 3.1.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -3108,7 +3186,7 @@ function constant(value) {
 
 module.exports = baseAssign;
 
-},{"lodash._basecopy":48,"lodash.isnative":53,"lodash.keys":54}],48:[function(require,module,exports){
+},{"lodash._basecopy":49,"lodash.isnative":54,"lodash.keys":55}],49:[function(require,module,exports){
 /**
  * lodash 3.0.1 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -3142,7 +3220,7 @@ function baseCopy(source, props, object) {
 
 module.exports = baseCopy;
 
-},{}],49:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 /**
  * lodash 3.1.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -3196,9 +3274,9 @@ function createAssigner(assigner) {
 
 module.exports = createAssigner;
 
-},{"lodash._bindcallback":50,"lodash._isiterateecall":51,"lodash.restparam":52}],50:[function(require,module,exports){
-arguments[4][32][0].apply(exports,arguments)
-},{"dup":32}],51:[function(require,module,exports){
+},{"lodash._bindcallback":51,"lodash._isiterateecall":52,"lodash.restparam":53}],51:[function(require,module,exports){
+arguments[4][33][0].apply(exports,arguments)
+},{"dup":33}],52:[function(require,module,exports){
 /**
  * lodash 3.0.6 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -3322,7 +3400,7 @@ function isObject(value) {
 
 module.exports = isIterateeCall;
 
-},{}],52:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 /**
  * lodash 3.6.1 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -3391,15 +3469,15 @@ function restParam(func, start) {
 
 module.exports = restParam;
 
-},{}],53:[function(require,module,exports){
-arguments[4][41][0].apply(exports,arguments)
-},{"dup":41}],54:[function(require,module,exports){
-arguments[4][38][0].apply(exports,arguments)
-},{"dup":38,"lodash.isarguments":55,"lodash.isarray":56,"lodash.isnative":53}],55:[function(require,module,exports){
-arguments[4][35][0].apply(exports,arguments)
-},{"dup":35}],56:[function(require,module,exports){
-arguments[4][33][0].apply(exports,arguments)
-},{"dup":33}],57:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
+arguments[4][42][0].apply(exports,arguments)
+},{"dup":42}],55:[function(require,module,exports){
+arguments[4][39][0].apply(exports,arguments)
+},{"dup":39,"lodash.isarguments":56,"lodash.isarray":57,"lodash.isnative":54}],56:[function(require,module,exports){
+arguments[4][36][0].apply(exports,arguments)
+},{"dup":36}],57:[function(require,module,exports){
+arguments[4][34][0].apply(exports,arguments)
+},{"dup":34}],58:[function(require,module,exports){
 /**
  * lodash 3.1.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -3465,7 +3543,7 @@ bind.placeholder = {};
 
 module.exports = bind;
 
-},{"lodash._createwrapper":58,"lodash._replaceholders":61,"lodash.restparam":62}],58:[function(require,module,exports){
+},{"lodash._createwrapper":59,"lodash._replaceholders":62,"lodash.restparam":63}],59:[function(require,module,exports){
 (function (global){
 /**
  * lodash 3.0.3 (Custom Build) <https://lodash.com/>
@@ -3849,7 +3927,7 @@ module.exports = createWrapper;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{"lodash._arraycopy":59,"lodash._basecreate":60,"lodash._replaceholders":61}],59:[function(require,module,exports){
+},{"lodash._arraycopy":60,"lodash._basecreate":61,"lodash._replaceholders":62}],60:[function(require,module,exports){
 /**
  * lodash 3.0.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -3880,7 +3958,7 @@ function arrayCopy(source, array) {
 
 module.exports = arrayCopy;
 
-},{}],60:[function(require,module,exports){
+},{}],61:[function(require,module,exports){
 (function (global){
 /**
  * lodash 3.0.1 (Custom Build) <https://lodash.com/>
@@ -3942,7 +4020,7 @@ module.exports = baseCreate;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{}],61:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
 /**
  * lodash 3.0.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -3981,9 +4059,9 @@ function replaceHolders(array, placeholder) {
 
 module.exports = replaceHolders;
 
-},{}],62:[function(require,module,exports){
-arguments[4][52][0].apply(exports,arguments)
-},{"dup":52}],63:[function(require,module,exports){
+},{}],63:[function(require,module,exports){
+arguments[4][53][0].apply(exports,arguments)
+},{"dup":53}],64:[function(require,module,exports){
 (function (global){
 /**
  * lodash 3.0.3 (Custom Build) <https://lodash.com/>
@@ -4143,7 +4221,7 @@ module.exports = isFunction;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{}],64:[function(require,module,exports){
+},{}],65:[function(require,module,exports){
 /**
  * lodash 3.0.1 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -4198,7 +4276,7 @@ function isRegExp(value) {
 
 module.exports = isRegExp;
 
-},{}],65:[function(require,module,exports){
+},{}],66:[function(require,module,exports){
 /**
  * lodash 3.1.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -4336,7 +4414,7 @@ function result(object, path, defaultValue) {
 
 module.exports = result;
 
-},{"lodash._baseget":66,"lodash._baseslice":67,"lodash._topath":68,"lodash.isarray":70,"lodash.isfunction":63}],66:[function(require,module,exports){
+},{"lodash._baseget":67,"lodash._baseslice":68,"lodash._topath":69,"lodash.isarray":71,"lodash.isfunction":64}],67:[function(require,module,exports){
 /**
  * lodash 3.7.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -4412,7 +4490,7 @@ function isObject(value) {
 
 module.exports = baseGet;
 
-},{}],67:[function(require,module,exports){
+},{}],68:[function(require,module,exports){
 /**
  * lodash 3.0.3 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -4455,7 +4533,7 @@ function baseSlice(array, start, end) {
 
 module.exports = baseSlice;
 
-},{}],68:[function(require,module,exports){
+},{}],69:[function(require,module,exports){
 /**
  * lodash 3.7.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
@@ -4493,11 +4571,11 @@ function toPath(value) {
 
 module.exports = toPath;
 
-},{"lodash._basetostring":69,"lodash.isarray":70}],69:[function(require,module,exports){
-arguments[4][45][0].apply(exports,arguments)
-},{"dup":45}],70:[function(require,module,exports){
-arguments[4][33][0].apply(exports,arguments)
-},{"dup":33}],71:[function(require,module,exports){
+},{"lodash._basetostring":70,"lodash.isarray":71}],70:[function(require,module,exports){
+arguments[4][46][0].apply(exports,arguments)
+},{"dup":46}],71:[function(require,module,exports){
+arguments[4][34][0].apply(exports,arguments)
+},{"dup":34}],72:[function(require,module,exports){
 
 // Wrapper based on https://github.com/umdjs/umd
 // https://github.com/umdjs/umd/blob/master/returnExports.js
@@ -4813,125 +4891,6 @@ Backbone.Collection.prototype.ioUnbindAll = function (io) {
     this.ioUnbind(ev, io);
   }
   return this;
-};
-
-
-  return Backbone;
-}));
-
-},{"backbone":75,"jquery":79,"socket.io-client":81,"underscore":82}],72:[function(require,module,exports){
-
-// Wrapper based on https://github.com/umdjs/umd
-// https://github.com/umdjs/umd/blob/master/returnExports.js
-
-(function (root, factory) {
-  if (typeof define === 'function' && define.amd) {
-    // AMD. Register as an anonymous module.
-    define(['backbone', 'underscore', 'socket.io', 'jquery'], factory);
-  } else if (typeof exports === 'object') {
-    // Node. Does not work with strict CommonJS, but
-    // only CommonJS-like environments that support module.exports,
-    // like Node.
-    var _ = require('underscore'),
-      Backbone = require('backbone'),
-      io = require('socket.io-client'),
-      $ = require('jquery');
-    module.exports = factory(Backbone, _, io, $);
-  } else {
-    // Browser globals (root is window)
-    factory(root.Backbone, root._, root.io, (root.jQuery || root.Zepto || root.ender || root.$));
-  }
-}(this, function (Backbone, _, io, $){
-
-
-/*!
- * backbone.iobind - Backbone.sync replacement
- * Copyright(c) 2011 Jake Luer <jake@alogicalparadox.com>
- * MIT Licensed
- */
-
-var ajaxSync = Backbone.sync;
-
-/**
- * # Backbone.sync
- *
- * Replaces default Backbone.sync function with socket.io transport
- *
- * ### Assumptions
- *
- * Currently expects active socket to be located at `window.socket`,
- * `Backbone.socket` or the sync'ed model own socket.
- * See inline comments if you want to change it.
- * ### Server Side
- *
- *     socket.on('todos:create', function (data, fn) {
- *      ...
- *      fn(null, todo);
- *     });
- *     socket.on('todos:read', ... );
- *     socket.on('todos:update', ... );
- *     socket.on('todos:delete', ... );
- *
- * @name sync
- */
-var socketSync = function (method, model, options) {
-  var params = _.extend({}, options)
-
-  if (params.url) {
-    params.url = _.result(params, 'url');
-  } else {
-    params.url = _.result(model, 'url') || urlError();
-  }
-
-  var cmd = params.url.split('/')
-    , namespace = (cmd[0] !== '') ? cmd[0] : cmd[1]; // if leading slash, ignore
-
-  if ( !params.data && model ) {
-    params.data = params.attrs || model.toJSON(options) || {};
-  }
-
-  if (params.patch === true && params.data.id == null && model) {
-    params.data.id = model.id;
-  }
-
-  // If your socket.io connection exists on a different var, change here:
-  var io = model.socket || Backbone.socket || window.socket
-
-  //since Backbone version 1.0.0 all events are raised in methods 'fetch', 'save', 'remove' etc
-
-  var defer = $.Deferred();
-  io.emit(namespace + ':' + method, params.data, function (err, data) {
-    if (err) {
-      if(options.error) options.error(err);
-      defer.reject();
-    } else {
-      if(options.success) options.success(data);
-      defer.resolve();
-    }
-  });
-  var promise = defer.promise();
-  model.trigger('request', model, promise, options);
-  return promise;
-};
-
-var getSyncMethod = function(model) {
-  if (_.result(model.ajaxSync)) {
-    return ajaxSync;
-  }
-
-  return socketSync;
-};
-
-// Override 'Backbone.sync' to default to socketSync,
-// the original 'Backbone.sync' is still available in 'Backbone.ajaxSync'
-Backbone.sync = function(method, model, options) {
-  return getSyncMethod(model).apply(this, [method, model, options]);
-};
-
-// Throw an error when a URL is needed, and none is supplied.
-// Copy from backbone.js#1558
-var urlError = function() {
-  throw new Error('A "url" property or function must be specified');
 };
 
 
@@ -15648,7 +15607,7 @@ Discus.View = Discus.View.extend({
 		if (this.isRenderComplete) {
 			return true;
 		}
-		if ((!this.__readyPromise || this.__readyPromise.isResolved()) &&
+		if ((!this.__readyPromise || this.__readyPromise.state() === 'resolved') &&
 			_.all(this.__children, function(child) { return child._checkRenderComplete(); }))
 		{
 			this.isRenderComplete = true;

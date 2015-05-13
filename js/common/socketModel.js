@@ -3,7 +3,6 @@ var _ = require('lodash');
 
 module.exports = Model.extend({
 	noIoBind: false,
-	socket: window.socket,
 	initialize: function () {
 		_.bindAll(this, 'serverChange', 'serverDelete', 'modelCleanup');
 

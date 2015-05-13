@@ -3,15 +3,34 @@ var _ = require('underscore');
 
 var UserIcon = App.View.extend({
 	template: _.template([
-		'Hey!!'
+		'<img src="<%- url %>" />'
 	].join('')),
 
-	initialize: function() {
-		console.log("I'm an icon!");
+	modelEvents: {
+		"change:profile": "render"
 	},
 
-	render: function() {
-		debugger;
+	initialize: function() {
+		if (this.model && _(this.model.get('profile')).isEmpty()) {
+			this.model.fetch();
+		}
+	},
+
+	getTemplateData: function() {
+		var data = this._super("getTemplateData", arguments);
+
+		data.url = null;
+
+		if (data.profile && data.profile._json) {
+			if (data.profile._json.avatar_url) {
+				data.url = data.profile._json.avatar_url;
+			} else {
+				// what's your avatar?
+				debugger;
+			}
+		}
+
+		return data;
 	}
 });
 

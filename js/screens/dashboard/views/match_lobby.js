@@ -129,41 +129,47 @@ var MatchLobby = App.View.extend({
 	},
 
 
+	sit: function(options) {
+		var self = this;
+
+		this.model.sit(options)
+			.done(this.finishSelectingSpot.bind(this));
+	},
 	joinYellowDefense: function() {
-		this.model.sit({
+		this.sit({
 			team: 0,
 			position: 'defense'
 		});
 	},
 	joinYellowOffense: function() {
-		this.model.sit({
+		this.sit({
 			team: 0,
 			position: 'offense'
 		});
 	},
 	
 	joinBlackDefense: function() {
-		this.model.sit({
+		this.sit({
 			team: 1,
 			position: 'defense'
 		});
 	},
 	joinBlackOffense: function() {
-		this.model.sit({
+		this.sit({
 			team: 1,
 			position: 'offense'
 		});
 	},
 
 	joinYellowMixed: function() {
-		this.model.sit({
+		this.sit({
 			team: 0,
 			position: 'mixed'
 		});
 	},
 
 	joinBlackMixed: function() {
-		this.model.sit({
+		this.sit({
 			team: 1,
 			position: 'mixed'
 		});

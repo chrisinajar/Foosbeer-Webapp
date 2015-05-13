@@ -69,6 +69,7 @@ var MatchView = App.View.extend({
 		this.model.match.set({
 			type: type
 		});
+		this.model.match.save();
 	},
 
 	resetState: function() {

@@ -37,6 +37,7 @@
     "backbone.radio": "^0.9.0",
     "bootstrap": "^3.3.4",
     "discus": "^0.10.0",
+    "engine.io-client": "^1.5.1",
     "jquery": "^2.1.3",
     "underscore": "^1.8.3",
     "webcomponents.js": "^0.6.1"
@@ -51,8 +52,7 @@
   "browser": {
     "app": "./js/app.js",
     "bootstrap": "./node_modules/bootstrap/dist/js/bootstrap.js",
-    "backbone.iobind": "./node_modules/backbone.iobind/dist/backbone.iobind.js",
-    "backbone.iosync": "./node_modules/backbone.iobind/dist/backbone.iosync.js"
+    "backbone.iobind": "./node_modules/backbone.iobind/dist/backbone.iobind.js"
   },
   "browserify": {
     "transform": [
