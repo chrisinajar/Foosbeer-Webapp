@@ -128,6 +128,7 @@ module.exports = Collection.extend({
 	}
 });
 },{"./collection":3,"lodash":80}],9:[function(require,module,exports){
+var App = require('app');
 var Model = require('./model');
 var _ = require('lodash');
 
@@ -145,6 +146,12 @@ module.exports = Model.extend({
 			this.ioBind('update', window.socket, this.serverChange, this);
 			this.ioBind('delete', window.socket, this.serverDelete, this);
 			this.bindCustom();
+
+
+			console.log(this.constructor.noun);
+			socket.roomAdd(this.constructor.noun, function() {
+				// done! cool.
+			})
 		}
 	},
 	bindCustom: function() {
@@ -169,7 +176,7 @@ module.exports = Model.extend({
 		return this;
 	}
 });
-},{"./model":4,"lodash":80}],10:[function(require,module,exports){
+},{"./model":4,"app":2,"lodash":80}],10:[function(require,module,exports){
 var Discus = require('discus');
 
 module.exports = Discus.View.extend({
@@ -219,11 +226,11 @@ var UserIcon = App.View.extend({
 	].join('')),
 
 	modelEvents: {
-		"change:profile": "render"
+		"change": "render"
 	},
 
 	initialize: function() {
-		if (this.model && _(this.model.get('profile')).isEmpty()) {
+		if (this.model && _(this.model.get('profile')).isEmpty() && !this.model.promise) {
 			this.model.fetch();
 		}
 	},
@@ -258,10 +265,17 @@ var Match = App.Model.extend({
 			model: require('./matchPlayer')
 		});
 
-		this.listenTo(this, "change:players", this.resetPlayers);
+		// this.listenTo(this, "change:players", this.resetPlayers);
 	},
-	resetPlayers: function() {
-		this.players.reset(this.get('players'));
+	parse: function() {
+		var data = this._super("parse", arguments);
+
+		this.resetPlayers(data.players);
+
+		return data;
+	},
+	resetPlayers: function(data) {
+		this.players.set(data || this.get('players'));
 	},
 	getPlayer: function(team, position) {
 		var matchPlayer = this.getMatchPlayer(team, position);
@@ -281,6 +295,7 @@ var Match = App.Model.extend({
 		return App.rpcgw.get('matchSit', options)
 			.done(function(data) {
 				self.set(data.match);
+				self.resetPlayers();
 			});
 	}
 }, {
@@ -328,9 +343,10 @@ module.exports = App.Model.extend({
 
 },{"./user":15,"app":2,"underscore":82}],15:[function(require,module,exports){
 var App = require('app');
+var Model =  require('../common/socketModel');
 var Match = require('./match');
 
-var User = App.Model.extend({
+var User = Model.extend({
 	defaults: {
 		email: null,
 		mmr: 500,
@@ -343,6 +359,7 @@ var User = App.Model.extend({
 
 	initialize: function() {
 		this.match = new Match(this.attributes.currentMatch);
+		this._super("initialize", arguments);
 	},
 	parse: function(data) {
 		data = this._super("parse", arguments);
@@ -363,10 +380,12 @@ var User = App.Model.extend({
 				debugger;
 			})
 			.done(function(data) {
+				var matchData = self.match.parse(data.match);
+				self.match.set(matchData);
 				self.set({
 					match_state: 'active',
-					currentMatch: data.match
-				}, { parse: true });
+					currentMatch: matchData
+				});
 			});
 	},
 	leaveMatch: function() {
@@ -386,7 +405,7 @@ var User = App.Model.extend({
 
 module.exports = User;
 
-},{"./match":13,"app":2}],16:[function(require,module,exports){
+},{"../common/socketModel":9,"./match":13,"app":2}],16:[function(require,module,exports){
 // External stuff. don't load local modules here..
 
 // global
@@ -459,6 +478,7 @@ var rpcgw = App.rpcgw = {
 		rpcgw.client.on('error', function() {
 			console.error("Action Hero threw an error!", arguments);
 		});
+
 
 
 		$.getJSON('/api/hello', function(data) {
@@ -720,18 +740,21 @@ var MatchLobby = App.View.extend({
 
 	initialize: function() {
 		this.stateModel = new App.Model();
-		// our model is the actual match. conveeeenient!
 
+		this.listenTo(this.model.players, "change reset add remove", this.render);
+		// our model is the actual match. conveeeenient!
 		this.resetState();
 	},
 
 	getTemplateData: function() {
 		var data = this._super("getTemplateData", arguments);
 
+		// debugger;
+
 		switch (data.type) {
 			case "1v1":
-				data.playerOne = this.model.getPlayer(0);
-				data.playerTwo = this.model.getPlayer(1);
+				data.playerOne = this.model.getPlayer(0, "mixed");
+				data.playerTwo = this.model.getPlayer(1, "mixed");
 				break;
 			case "2v2":
 				data.playerOneOffense = this.model.getPlayer(0, "offense");
@@ -744,6 +767,10 @@ var MatchLobby = App.View.extend({
 		return data;
 	},
 
+	// render: function() {
+	// 	debugger;
+	// 	this._super("render", arguments);
+	// },
 
 	sit: function(options) {
 		var self = this;
@@ -820,7 +847,10 @@ var MatchView = App.View.extend({
 	// we use different templates depending on what mode we're currently in
 	// this is maintained by stateModel.state
 	inactive_template: _.template([
-		'<div class="btn btn-default btn-large createMatch">Create Match</div>'
+		'<div class="btn-group btn-group-md btn-group-justified">',
+			'<div class="btn btn-default btn-large createMatch">Create Match</div>',
+			'<div class="btn btn-default btn-large findMatch">Find Match</div>',
+		'</div>',
 	].join('')),
 
 	active_template: _.template([
@@ -880,6 +910,10 @@ var MatchView = App.View.extend({
 			type = '1v1';
 		}
 		this.model.match.set({
+			players: _(this.model.match.get('players')).map(function(player) {
+				player.position = 'standing';
+				return player;
+			}),
 			type: type
 		});
 		this.model.match.save();
@@ -14230,6 +14264,7 @@ Discus.ListView = Discus.View.extend({
 		}
 		if (!lastView) {
 			this.getRenderTarget().empty();
+			this.renderHeader();
 			return;
 		}
 

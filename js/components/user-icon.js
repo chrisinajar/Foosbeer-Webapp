@@ -7,11 +7,11 @@ var UserIcon = App.View.extend({
 	].join('')),
 
 	modelEvents: {
-		"change:profile": "render"
+		"change": "render"
 	},
 
 	initialize: function() {
-		if (this.model && _(this.model.get('profile')).isEmpty()) {
+		if (this.model && _(this.model.get('profile')).isEmpty() && !this.model.promise) {
 			this.model.fetch();
 		}
 	},

@@ -7,7 +7,10 @@ var MatchView = App.View.extend({
 	// we use different templates depending on what mode we're currently in
 	// this is maintained by stateModel.state
 	inactive_template: _.template([
-		'<div class="btn btn-default btn-large createMatch">Create Match</div>'
+		'<div class="btn-group btn-group-md btn-group-justified">',
+			'<div class="btn btn-default btn-large createMatch">Create Match</div>',
+			'<div class="btn btn-default btn-large findMatch">Find Match</div>',
+		'</div>',
 	].join('')),
 
 	active_template: _.template([
@@ -67,6 +70,10 @@ var MatchView = App.View.extend({
 			type = '1v1';
 		}
 		this.model.match.set({
+			players: _(this.model.match.get('players')).map(function(player) {
+				player.position = 'standing';
+				return player;
+			}),
 			type: type
 		});
 		this.model.match.save();

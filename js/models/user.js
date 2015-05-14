@@ -1,7 +1,8 @@
 var App = require('app');
+var Model =  require('../common/socketModel');
 var Match = require('./match');
 
-var User = App.Model.extend({
+var User = Model.extend({
 	defaults: {
 		email: null,
 		mmr: 500,
@@ -14,6 +15,7 @@ var User = App.Model.extend({
 
 	initialize: function() {
 		this.match = new Match(this.attributes.currentMatch);
+		this._super("initialize", arguments);
 	},
 	parse: function(data) {
 		data = this._super("parse", arguments);
@@ -34,10 +36,12 @@ var User = App.Model.extend({
 				debugger;
 			})
 			.done(function(data) {
+				var matchData = self.match.parse(data.match);
+				self.match.set(matchData);
 				self.set({
 					match_state: 'active',
-					currentMatch: data.match
-				}, { parse: true });
+					currentMatch: matchData
+				});
 			});
 	},
 	leaveMatch: function() {

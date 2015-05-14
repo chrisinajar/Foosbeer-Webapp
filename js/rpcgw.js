@@ -35,6 +35,7 @@ var rpcgw = App.rpcgw = {
 		});
 
 
+
 		$.getJSON('/api/hello', function(data) {
 			console.log(data);
 				rpcgw.client.connect(function(err, details) {

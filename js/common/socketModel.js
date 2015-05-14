@@ -1,3 +1,4 @@
+var App = require('app');
 var Model = require('./model');
 var _ = require('lodash');
 
@@ -15,6 +16,12 @@ module.exports = Model.extend({
 			this.ioBind('update', window.socket, this.serverChange, this);
 			this.ioBind('delete', window.socket, this.serverDelete, this);
 			this.bindCustom();
+
+
+			console.log(this.constructor.noun);
+			socket.roomAdd(this.constructor.noun, function() {
+				// done! cool.
+			})
 		}
 	},
 	bindCustom: function() {

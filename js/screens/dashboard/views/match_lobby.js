@@ -104,18 +104,21 @@ var MatchLobby = App.View.extend({
 
 	initialize: function() {
 		this.stateModel = new App.Model();
-		// our model is the actual match. conveeeenient!
 
+		this.listenTo(this.model.players, "change reset add remove", this.render);
+		// our model is the actual match. conveeeenient!
 		this.resetState();
 	},
 
 	getTemplateData: function() {
 		var data = this._super("getTemplateData", arguments);
 
+		// debugger;
+
 		switch (data.type) {
 			case "1v1":
-				data.playerOne = this.model.getPlayer(0);
-				data.playerTwo = this.model.getPlayer(1);
+				data.playerOne = this.model.getPlayer(0, "mixed");
+				data.playerTwo = this.model.getPlayer(1, "mixed");
 				break;
 			case "2v2":
 				data.playerOneOffense = this.model.getPlayer(0, "offense");
@@ -128,6 +131,10 @@ var MatchLobby = App.View.extend({
 		return data;
 	},
 
+	// render: function() {
+	// 	debugger;
+	// 	this._super("render", arguments);
+	// },
 
 	sit: function(options) {
 		var self = this;

@@ -7,10 +7,17 @@ var Match = App.Model.extend({
 			model: require('./matchPlayer')
 		});
 
-		this.listenTo(this, "change:players", this.resetPlayers);
+		// this.listenTo(this, "change:players", this.resetPlayers);
 	},
-	resetPlayers: function() {
-		this.players.reset(this.get('players'));
+	parse: function() {
+		var data = this._super("parse", arguments);
+
+		this.resetPlayers(data.players);
+
+		return data;
+	},
+	resetPlayers: function(data) {
+		this.players.set(data || this.get('players'));
 	},
 	getPlayer: function(team, position) {
 		var matchPlayer = this.getMatchPlayer(team, position);
@@ -30,6 +37,7 @@ var Match = App.Model.extend({
 		return App.rpcgw.get('matchSit', options)
 			.done(function(data) {
 				self.set(data.match);
+				self.resetPlayers();
 			});
 	}
 }, {
