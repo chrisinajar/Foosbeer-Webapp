@@ -24,6 +24,8 @@ var UserIcon = App.View.extend({
 		if (data.profile && data.profile._json) {
 			if (data.profile._json.avatar_url) {
 				data.url = data.profile._json.avatar_url;
+			} else if (data.profile.photos[0].value) {
+				data.url = data.profile.photos[0].value;
 			} else {
 				// what's your avatar?
 				debugger;

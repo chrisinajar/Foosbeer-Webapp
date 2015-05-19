@@ -5,6 +5,10 @@ var MatchLobby = App.View.extend({
 	className: 'lobby',
 
 	view_1v1_template: _.template([
+		'<% if (players.length === maxPlayers) { %>',
+			'<div class="btn btn-large btn-default finishMatch">Complete Match</div>',
+		'<% } %>',
+
 		'<div class="row">',
 			'<div class="col-xs-5">',
 				'<div class="row">',
@@ -22,6 +26,10 @@ var MatchLobby = App.View.extend({
 	].join('')),
 
 	view_2v2_template: _.template([
+		'<% if (players.length === maxPlayers) { %>',
+			'<div class="btn btn-large btn-default finishMatch">Complete Match</div>',
+		'<% } %>',
+
 		'<div class="row">',
 			'<div class="col-xs-5">',
 				'<div class="row">',
@@ -80,6 +88,20 @@ var MatchLobby = App.View.extend({
 		'</div>',
 	].join('')),
 
+	score_template: _.template([
+		'<div class="row">',
+			'<div class="col-xs-5">',
+				'<input type="number" step="1" min="0" required="true" class="scoreOne" placeholder="<%- ~~(Math.random()*10) %>">',
+			'</div>',
+			'<div class="col-xs-2">',
+				'<div class="finishScore">Done</div>',
+			'</div>',
+			'<div class="col-xs-5">',
+				'<input type="number" step="1" min="0" required="true" class="scoreTwo" placeholder="<%- ~~(Math.random()*10) %>">',
+			'</div>',
+		'</div>',
+	].join('')),
+
 	events: {
 		'click .joinYellowDefense': 'joinYellowDefense',
 		'click .joinYellowOffense': 'joinYellowOffense',
@@ -91,10 +113,13 @@ var MatchLobby = App.View.extend({
 
 		'click .joinBlackMixed': 'joinBlackMixed',
 
+		'click .finishMatch': 'finishMatch',
+		'click .finishScore': 'finishScore'
 	},
 
 	modelEvents: {
-		'change:type': 'resetState'
+		'change:type': 'resetState',
+		'change:players': 'render'
 	},
 
 	stateModelEvents: {
@@ -192,6 +217,16 @@ var MatchLobby = App.View.extend({
 			selecting: false
 		});
 	},
+
+	finishMatch: function() {
+		this.stateModel.set({
+			state: 'score'
+		});
+	},
+	finishScore: function() {
+		this.model.finish(this.$(".scoreOne").val(), this.$(".scoreTwo").val()).done(App.user.fetch.bind(App.user));
+	},
+
 	resetState: function() {
 		this.stateModel.set({
 			state: (this.stateModel.get('selecting') ? 'selecting' : 'view') + '_' + this.model.get('type')

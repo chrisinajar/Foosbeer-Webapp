@@ -1,6 +1,7 @@
 var App = require('app');
 var _ = require('underscore');
 var MatchLobby = require('./match_lobby');
+var MatchList = require('./match_list');
 
 var MatchView = App.View.extend({
 	className: 'panel',
@@ -11,6 +12,15 @@ var MatchView = App.View.extend({
 			'<div class="btn btn-default btn-large createMatch">Create Match</div>',
 			'<div class="btn btn-default btn-large findMatch">Find Match</div>',
 		'</div>',
+	].join('')),
+
+	searching_template: _.template([
+		'<div class="btn-group btn-group-md btn-group-justified">',
+			'<div class="btn btn-default btn-large createMatch">Create Match</div>',
+			'<div class="btn btn-default btn-large cancelSearch">Cancel Searching</div>',
+		'</div>',
+		'<br />',
+		'<div id="matchList"></div>'
 	].join('')),
 
 	active_template: _.template([
@@ -33,6 +43,8 @@ var MatchView = App.View.extend({
 
 	events: {
 		'click .createMatch': 'createMatch',
+		'click .findMatch': 'findMatch',
+		'click .cancelSearch': 'resetState',
 		'click .leaveMatch': 'leaveMatch',
 		'click .selectSpot': 'selectSpot',
 		'click .toggleMatchMode': 'toggleMatchMode'
@@ -54,6 +66,23 @@ var MatchView = App.View.extend({
 
 	createMatch: function() {
 		this.model.createMatch();
+	},
+	findMatch: function() {
+		this.matches = this.model.listMatches();
+
+		if (this.matchList) {
+			this.matchList.remove();
+			this.matchList = null;
+		}
+		this.matchList = new MatchList({
+			parent: this,
+			renderTo: '#matchList',
+
+			collection: this.matches
+		});
+		this.stateModel.set({
+			state: 'searching'
+		});
 	},
 	leaveMatch: function() {
 		this.model.leaveMatch();

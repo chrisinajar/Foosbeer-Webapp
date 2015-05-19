@@ -1,7 +1,7 @@
 // rpcgw. handle login, rely on static login page for login
 var App = require('app');
 var User = require('./models/user');
-
+var _ = require('underscore');
 
 App.logout = function() {
 	return $.ajax({
@@ -62,6 +62,9 @@ var rpcgw = App.rpcgw = {
 			deff = new $.Deferred(),
 			promise;
 
+		if (_.isArray(data)) {
+			data = null; // fuck arrays!!!
+		}
 		rpcgw.client.action(api, data, function(result) {
 			if (result.error) {
 				console.warn("API error:", api, result.message || result.error);
@@ -80,8 +83,15 @@ var rpcgw = App.rpcgw = {
 
 	sync: function(action, model, options, errcb) {
 		var deferr = new $.Deferred(),
-			noun = model.constructor.noun;
+			noun = model.constructor.noun || model.urlRoot;
 
+		// debugger;
+		if (model instanceof App.Collection) {
+			if (!noun) {
+				noun = model.model.noun || model.model.prototype.urlRoot;
+			}
+			noun += 'List';
+		}
 
 		if (typeof options == 'function') {
 			options = {
@@ -103,7 +113,7 @@ var rpcgw = App.rpcgw = {
 		}
 		function parseResult(noun, cb) {
 			return function(result) {
-				cb(result[noun] || result.value || result);
+				cb(result[noun] || result.data || result);
 			}
 		}
 		switch (action) {

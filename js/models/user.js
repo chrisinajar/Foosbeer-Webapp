@@ -53,6 +53,31 @@ var User = Model.extend({
 					currentMatch: null
 				}, { parse: true });
 			});
+	},
+	listMatches: function() {
+		var Type = App.Collection.extend({
+				model: Match
+			}),
+			collection = new Type();
+
+		collection.fetch();
+
+		return collection;
+	},
+	joinMatch: function(id) {
+		var self = this;
+		App.rpcgw.get('matchJoin', { id: id })
+			.fail(function(data) {
+				debugger;
+			})
+			.done(function(data) {
+				var matchData = self.match.parse(data.match);
+				self.match.set(matchData);
+				self.set({
+					match_state: 'active',
+					currentMatch: matchData
+				});
+			});
 	}
 
 }, {
