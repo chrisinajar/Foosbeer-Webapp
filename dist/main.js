@@ -315,6 +315,11 @@ var Match = App.Model.extend({
 		return App.rpcgw.get('matchFinish', {
 			scoreOne: scoreOne,
 			scoreTwo: scoreTwo
+		}).done(function() {
+			App.user.set({
+				currentMatch: null,
+				match_state: 'inactive'
+			})
 		});
 	}
 }, {
@@ -820,7 +825,7 @@ var MatchLobby = App.View.extend({
 				'<input type="number" step="1" min="0" required="true" class="scoreOne" placeholder="<%- ~~(Math.random()*10) %>">',
 			'</div>',
 			'<div class="col-xs-2">',
-				'<div class="finishScore">Done</div>',
+				'<div class="btn btn-default btn-large finishScore">Done</div>',
 			'</div>',
 			'<div class="col-xs-5">',
 				'<input type="number" step="1" min="0" required="true" class="scoreTwo" placeholder="<%- ~~(Math.random()*10) %>">',
@@ -950,7 +955,7 @@ var MatchLobby = App.View.extend({
 		});
 	},
 	finishScore: function() {
-		this.model.finish(this.$(".scoreOne").val(), this.$(".scoreTwo").val()).done(App.user.fetch.bind(App.user));
+		this.model.finish(this.$(".scoreOne").val(), this.$(".scoreTwo").val());
 	},
 
 	resetState: function() {

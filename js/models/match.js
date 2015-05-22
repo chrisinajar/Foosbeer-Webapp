@@ -55,6 +55,11 @@ var Match = App.Model.extend({
 		return App.rpcgw.get('matchFinish', {
 			scoreOne: scoreOne,
 			scoreTwo: scoreTwo
+		}).done(function() {
+			App.user.set({
+				currentMatch: null,
+				match_state: 'inactive'
+			})
 		});
 	}
 }, {
